@@ -5,11 +5,15 @@ Fingerspell - NGT Fingerspelling Recognition
 Main entry point for the application.
 """
 
+import multiprocessing
 from src.fingerspell.ui.window import run_app
 from src.fingerspell.utils import get_resource_path, verify_resource_exists
 
 
 if __name__ == '__main__':
+    # Required for PyInstaller to prevent infinite process spawning
+    multiprocessing.freeze_support()
+    
     # Get paths to models using resource utility
     static_model = get_resource_path('models/ngt_static_classifier.pkl')
     dynamic_model = get_resource_path('models/ngt_dynamic_classifier.pkl')
