@@ -28,3 +28,6 @@ joblib
 
 # Testing
 pytest
+
+# Packaging
+pyinstaller
