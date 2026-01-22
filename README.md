@@ -146,8 +146,37 @@ Dynamic Letter Model (5 letters):
 
 After the initial development phase, we continued to improve the product by doing the following...
 
-- 22 Jan: Error analysis leads to adding additional data 
+- 22 Jan: Error analysis leads to adding additional data. We gathered max confidence scores and identified signs that had poor performance. The goal is to get >=70 for all signs across three users.
+- 
 
+| Sign | Max AC | Max YM | Max AR | Average | Proposed Action                             |
+| ---- | ------ | ------ | ------ | ------- | ------------------------------------------- |
+| A    | 95     | 76     | 54     | 75      |                                             |
+| B    | 54     | 73     | 65     | 64      | Everyone: remove existing & add new samples |
+| C    | 100    | 91     | 80     | 90      |                                             |
+| D    | 100    | 45     | 85     | 77      |                                             |
+| E    | 89     | 85     | 85     | 86      |                                             |
+| F    | 83     | 76     | 71     | 77      |                                             |
+| G    | 62     | 57     | 60     | 60      | Everyone: remove existing & add new samples |
+| H    | 100    | 47     | 79     | 75      |                                             |
+| I    | 97     | 92     | 90     | 93      |                                             |
+| J    | 86     | 94     | 80     | 87      |                                             |
+| K    | 30     | 61     | 80     | 57      | Everyone: remove existing & add new samples |
+| L    | 70     | 20     | 80     | 57      | Yuliia add new sampless                     |
+| M    | 90     | 0      | 0      | 30      | Everyone: remove existing & add new samples |
+| N    | 70     | 0      | 0      | 23      | Everyone: remove existing & add new samples |
+| O    | 82     | 72     | 63     | 72      |                                             |
+| P    | 97     | 41     | 41     | 60      | Everyone: remove existing & add new samples |
+| Q    | 90     | 0      | 0      | 30      | Everyone: remove existing & add new samples |
+| R    | 92     | 93     | 0      | 62      | Andrii add new sampless                     |
+| S    | 99     | 70     | 60     | 76      |                                             |
+| T    | 60     | 86     | 80     | 75      | Aaron add new sampless                      |
+| U    | 100    | 100    | 91     | 97      |                                             |
+| V    | 82     | 84     | 68     | 78      |                                             |
+| W    | 99     | 90     | 82     | 90      |                                             |
+| X    | 82     | 91     | 77     | 83      |                                             |
+| Y    | 80     | 87     | 82     | 83      |                                             |
+| Z    | 90     | 94     | 73     | 86      |                                             |
 
 ### Key Lessons
 
