@@ -1,6 +1,13 @@
-# FingerSpell
+# FingerSpell <!-- omit from toc -->
 
 Finger Spelling Practice in Python
+
+**Table of Contents**
+
+- [Project Description](#project-description)
+- [Development Approach](#development-approach)
+- [Sources Cited](#sources-cited)
+
 
 **Authors:**
 
@@ -12,7 +19,145 @@ Finger Spelling Practice in Python
 
 This project offers Nederlanse Gebaren Taal Vingeralfabet (NGT Finger Alphabet) training for beginners. The model signs are based on the examples provided by [Vera de Kok](https://nl.wikipedia.org/wiki/Bestand:NGT_handalfabet.webm).
 
-## Sources
+## Development Approach
+
+### The Challenge
+
+The primary technical challenge in NGT fingerspelling recognition is distinguishing between static and dynamic letters:
+
+- **Static letters** (A, B, C, D, E, F, G, I, K, L, M, N, O, P, Q, R, S, T, V, W, Y): Finger and hand positions remain fixed once the letter is formed. These can be recognized from a single frame.
+- **Dynamic letters** (H, J, U, X, Z): The hand sign is formed with fingers in a static shape, but the entire hand moves, twists, or rotates in one or more planes and axes. These require temporal information to recognize correctly.
+
+### Technical Background
+
+This project uses two types of machine learning models:
+
+- **Convolutional Neural Networks (CNN)**: Deep learning models that excel at pattern recognition in data. CNNs are very good at recognizing features like shapes and forms automatically but require substantial training time and computational resources.
+- **Random Forest**: Models that make predictions by combining multiple decisions. They train quickly and work well with structured numerical data like hand landmark coordinates.
+
+### Initial Development Timeline
+
+Initial development took place from January 19-22, 2026, progressing through four iterations. Work continued through 30 January, adding features and improving performance.
+
+#### Iteration 1: Proof of Concept (Random Forest)
+
+- Collected approximately 200 samples per static letter and 400 samples per dynamic letter. 
+- Trained a single Random Forest classifier on MediaPipe hand landmarks (21 3D points = 63 features). 
+- Results showed high accuracy and fast training times, validating the approach for static letters.
+
+#### Iteration 2: Dual Model System
+
+- Created separate Random Forest models for static and dynamic letters. 
+- Implemented a basic supervisor component to route predictions based on hand movement detected in individual frames.
+- Static letters performed well, but dynamic letter accuracy remained low due to insufficient motion information.
+
+#### Iteration 3: Neural Network Approach
+
+We wanted to explore existing solutions and datasets to avoid "reinventing the wheel". We found the [ashgadala/american-sign-language-detection](https://github.com/ashgadala/american-sign-language-detection) ASL fingerspelling recognition project to be a good jumping off point for trying CNN models.
+
+- Adopted code and data structure from the [ASL](https://github.com/ashgadala/american-sign-language-detection) detection project.
+- Collected new training data for NGT letters that differ from ASL (approximately 60% of the alphabet). 
+- Trained a CNN achieving 99% overall accuracy with excellent precision, recall, and F1 scores across all letters.
+
+**CNN Classification Results:**
+
+```text
+              precision    recall  f1-score   support
+    accuracy                           0.99      7891
+   macro avg       0.99      0.99      0.99      7891
+weighted avg       0.99      0.99      0.99      7891
+```
+
+![CNN Confusion Matrix](./docs/CNN_confusion.png)
+
+Despite strong performance metrics, the CNN approach had critical limitations:
+
+- Dynamic letters registered intermittently because the model received individual frames without temporal context
+- No frame buffering was implemented to capture motion patterns
+- Training required significant time (minutes to hours), making rapid iteration difficult
+- Implementing context windows (concatenating multiple frames) felt overly complex for the project timeline
+
+#### Iteration 4: Enhanced Dual Random Forest System (Final Solution)
+
+Returned to the dual Random Forest approach with significant improvements to motion detection and feature engineering.
+
+**Key Innovation - Delta Features:**
+
+MediaPipe normalizes hand landmarks by setting the wrist as the origin, which removes absolute position information needed for motion detection. To capture movement, we implemented delta features that measure landmark position changes across a 5-frame window:
+
+- Calculate the difference in each landmark's normalized position between consecutive frames
+- Aggregate these differences to detect movement across all 21 hand joints
+- High delta values indicate motion is occurring
+
+The motion detection system uses two metrics:
+
+1. **Total landmark displacement**: Sum of all position changes across all joints
+2. **Absolute wrist displacement**: Movement of the wrist in the original (non-normalized) coordinate space
+
+This dual-metric approach achieves 96.7% accuracy in classifying frames as static or dynamic motion.
+
+**Model Architecture:**
+
+```text
+Camera Feed
+     |
+     v
+MediaPipe Hand Detection
+     |
+     v
+Motion Detection (5-frame buffer)
+     |
+     v
+Supervisor Component
+     |
+     +-- Static motion detected --> Static Random Forest (21 letters, 42 features)
+     |
+     +-- Dynamic motion detected --> Dynamic Random Forest (5 letters, 84 features)
+     |
+     v
+Letter Prediction
+```
+
+**Final Results:**
+
+Static Letter Model (21 letters):
+
+```text
+              precision    recall  f1-score   support
+weighted avg       1.00      0.99      0.99      8582
+```
+
+Dynamic Letter Model (5 letters):
+
+```text
+              precision    recall  f1-score   support
+             H       1.00      1.00      1.00       805
+             J       1.00      1.00      1.00       603
+             U       1.00      1.00      1.00       516
+             X       1.00      1.00      1.00       693
+             Z       0.99      0.99      0.99       609
+
+      accuracy                           1.00      3226
+    macro avg       1.00      1.00      1.00      3226
+ weighted avg       1.00      1.00      1.00      3226
+```
+
+### Continued Improvements
+
+After the initial development phase, we continued to improve the product by doing the following...
+
+- 22 Jan: Error analysis leads to adding additional data 
+
+
+### Key Lessons
+
+1. **Normalization matters**: MediaPipe's wrist-centered normalization is essential for position-invariant hand shape recognition, but it removes motion information. Capturing both normalized and raw coordinates solved this challenge.
+
+2. **Delta features as motion proxy**: Computing position differences across frame windows provides an effective, interpretable way to capture movement patterns without complex temporal modeling.
+
+3. **Model simplicity enables iteration**: Random Forest models train in seconds rather than minutes, allowing rapid experimentation with features, data collection strategies, and model architectures.
+
+## Sources Cited
 
 | Source                                                                                                      | Description                                                               | Usage                                                                              | License                                                                                |
 | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
