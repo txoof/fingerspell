@@ -1,6 +1,10 @@
 # fingerspell
 Finger Spelling Practice in Python
 
+
+
+
+
 ## Packaging Instructions
 
 This guide covers building standalone executables for macOS and Windows.
