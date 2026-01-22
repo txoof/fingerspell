@@ -25,3 +25,6 @@ ipykernel
 
 # Optional: for model persistence
 joblib
+
+# Testing
+pytest
