@@ -1,7 +1,8 @@
 """
 Common UI utilities shared across recognition and collection.
 
-Provides modal overlay functions for displaying text and getting user input.
+Provides modal overlay functions for displaying text and getting user input,
+and hand skeleton drawing.
 """
 
 import cv2
@@ -149,6 +150,64 @@ def draw_modal_input(image, prompt, current_input, error_msg=None,
     instructions = "ENTER=Confirm | BACKSPACE=Delete | ESC=Cancel"
     cv2.putText(image, instructions, (box_x + 20, box_y + y_offset + 30),
                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
+    
+    return image
+
+
+def draw_landmarks(image, landmark_point):
+    """
+    Draw hand skeleton connections on image.
+    
+    Draws lines connecting hand landmarks to create a skeleton visualization.
+    Uses black outline with white lines for visibility.
+    
+    Args:
+        image: OpenCV image to draw on (modified in place)
+        landmark_point: List of [x, y] coordinate pairs (21 landmarks)
+    
+    Returns:
+        image: Image with hand skeleton drawn
+    """
+    if len(landmark_point) == 0:
+        return image
+    
+    def draw_line(p1, p2):
+        """Draw a line between two landmark points with outline."""
+        cv2.line(image, tuple(landmark_point[p1]), tuple(landmark_point[p2]), (0, 0, 0), 6)
+        cv2.line(image, tuple(landmark_point[p1]), tuple(landmark_point[p2]), (255, 255, 255), 2)
+    
+    # Thumb
+    draw_line(2, 3)
+    draw_line(3, 4)
+    
+    # Index finger
+    draw_line(5, 6)
+    draw_line(6, 7)
+    draw_line(7, 8)
+    
+    # Middle finger
+    draw_line(9, 10)
+    draw_line(10, 11)
+    draw_line(11, 12)
+    
+    # Ring finger
+    draw_line(13, 14)
+    draw_line(14, 15)
+    draw_line(15, 16)
+    
+    # Pinky
+    draw_line(17, 18)
+    draw_line(18, 19)
+    draw_line(19, 20)
+    
+    # Palm
+    draw_line(0, 1)
+    draw_line(1, 2)
+    draw_line(2, 5)
+    draw_line(5, 9)
+    draw_line(9, 13)
+    draw_line(13, 17)
+    draw_line(17, 0)
     
     return image
 
