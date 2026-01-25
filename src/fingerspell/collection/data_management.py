@@ -1,15 +1,16 @@
 """
 Data management utilities for sign language collection.
 
-Handles saving collected data and discarding samples during collection.
+Handles saving collected data, discarding samples, and displaying collection status.
 """
 
 import csv
 from datetime import datetime
 from pathlib import Path
 import pandas as pd
-from src.fingerspell.ui.common import draw_modal_input, draw_modal_overlay
 import cv2
+from PIL import Image, ImageDraw, ImageFont
+from src.fingerspell.ui.common import draw_modal_input, draw_modal_overlay, draw_text
 
 
 def save_final_data(temp_filename, alphabet, label_map):
@@ -216,41 +217,74 @@ def discard_samples(temp_filename, alphabet, label_map, collected_per_letter):
     
     return collected_per_letter
 
+
 def draw_letter_status(image, alphabet, collected_per_letter, targets, dynamic_letters):
     """
-    Draw letter status with color coding and checkboxes.
-    
-    Args:
-        image: OpenCV image to draw on
-        alphabet: List of letters in order
-        collected_per_letter: Dict mapping letter -> count
-        targets: Dict mapping letter -> target count
-        dynamic_letters: Set of dynamic letters
-    
-    Returns:
-        image: Image with letter status drawn
+    Draw letter status with auto-wrapping for long alphabets.
     """
-    h = image.shape[0]
-    y_start = h - 80
+    h, w = image.shape[:2]
     
-    # Semi-transparent background
-    overlay = image.copy()
-    cv2.rectangle(overlay, (10, y_start), (image.shape[1] - 10, h - 10), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
-    
-    # Build status text
+    # Build status text with Unicode checkboxes
     text = ""
     for letter in alphabet:
         count = collected_per_letter.get(letter, 0)
         target = targets.get(letter, 0)
         is_complete = count >= target
         
-        # Checkbox: ☑ for complete, ☐ for incomplete
-        checkbox = chr(0x2611) if is_complete else chr(0x2610)
+        # Unicode ballot box: ☑ for complete, ☐ for incomplete
+        checkbox = "☑" if is_complete else "☐"
         text += f"{checkbox}{letter}({count}) "
     
-    # Draw text (may need to wrap if too long)
-    cv2.putText(image, text, (20, y_start + 30),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    # Measure text to calculate wrapping
+    font_size = 24
+    bundled_font = Path("../assets/fonts/DejaVuSans.ttf")
+    try:
+        font = ImageFont.truetype(str(bundled_font), font_size)
+    except:
+        font = ImageFont.load_default()
+    
+    pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    draw_obj = ImageDraw.Draw(pil_image)
+    
+    # Calculate available width
+    available_width = w - 40  # 20px padding on each side
+    
+    # Wrap text manually by measuring
+    words = text.split()
+    lines = []
+    current_line = ""
+    
+    for word in words:
+        test_line = current_line + word + " "
+        bbox = draw_obj.textbbox((0, 0), test_line, font=font)
+        line_width = bbox[2] - bbox[0]
+        
+        if line_width <= available_width:
+            current_line = test_line
+        else:
+            if current_line:
+                lines.append(current_line.strip())
+            current_line = word + " "
+    
+    if current_line:
+        lines.append(current_line.strip())
+    
+    # Calculate box height based on number of lines
+    line_height = 35
+    padding = 20
+    box_height = len(lines) * line_height + padding * 2
+    y_start = h - box_height - 10
+    
+    # Semi-transparent background
+    overlay = image.copy()
+    cv2.rectangle(overlay, (10, y_start), (w - 10, h - 10), (0, 0, 0), -1)
+    cv2.addWeighted(overlay, 0.85, image, 0.15, 0, image)
+    
+    # Draw each line
+    y_text = y_start + padding
+    for line in lines:
+        image = draw_text(image, line, (20, y_text),
+                         font_size=font_size, color=(255, 255, 255))
+        y_text += line_height
     
     return image
