@@ -7,14 +7,13 @@ Handles menu system and mode dispatching.
 from pathlib import Path
 from src.fingerspell.ui.menu import Menu
 from src.fingerspell.ui.window import run_app
+from src.fingerspell.collection.collector import run_collection
+
 
 
 def run_collection_mode(project_root):
     """Run data collection workflow."""
-    print("\nStarting collection mode...")
-    # TODO: Implement collection workflow
-    print("Collection mode - not yet implemented")
-    input("Press ENTER to return to menu...")
+    run_collection(project_root)
 
 
 def run_training_mode(project_root):
