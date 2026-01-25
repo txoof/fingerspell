@@ -281,3 +281,156 @@ if __name__ == '__main__':
     
     cv2.destroyAllWindows()
     print("\nSmoke test complete!")
+
+
+def draw_progress_bar(image, current_count, target, letter, y_position=60):
+    """
+    Draw progress bar for current letter.
+    
+    Args:
+        image: OpenCV image to draw on
+        current_count: Current number of samples
+        target: Target number of samples
+        letter: Current letter being collected
+        y_position: Y coordinate for bar
+    
+    Returns:
+        image: Image with progress bar drawn
+    """
+    bar_x = 20
+    bar_width = 400
+    bar_height = 30
+    
+    # Background
+    cv2.rectangle(image, (bar_x, y_position), 
+                 (bar_x + bar_width, y_position + bar_height),
+                 (80, 80, 80), -1)
+    
+    # Fill based on progress
+    progress = min(1.0, current_count / target) if target > 0 else 0
+    fill_width = int(bar_width * progress)
+    
+    # Color: green if complete, yellow if in progress
+    if progress >= 1.0:
+        fill_color = (0, 255, 0)
+    else:
+        fill_color = (0, 255, 255)
+    
+    if fill_width > 0:
+        cv2.rectangle(image, (bar_x, y_position),
+                     (bar_x + fill_width, y_position + bar_height),
+                     fill_color, -1)
+    
+    # Border
+    cv2.rectangle(image, (bar_x, y_position),
+                 (bar_x + bar_width, y_position + bar_height),
+                 (200, 200, 200), 2)
+    
+    # Text: Letter and percentage
+    text = f"{letter}: {current_count}/{target} ({progress*100:.1f}%)"
+    cv2.putText(image, text, (bar_x + 10, y_position - 10),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+    
+    return image
+
+
+def draw_instructions(image, is_paused, position='topright'):
+    """
+    Draw on-screen instructions.
+    
+    Args:
+        image: OpenCV image to draw on
+        is_paused: Whether collection is paused (shows more detail)
+        position: 'topright' or 'topleft'
+    
+    Returns:
+        image: Image with instructions drawn
+    """
+    h, w = image.shape[:2]
+    
+    if position == 'topright':
+        x = w - 250
+        y = 20
+    else:
+        x = 20
+        y = 20
+    
+    # Semi-transparent background
+    box_height = 180 if is_paused else 100
+    overlay = image.copy()
+    cv2.rectangle(overlay, (x, y), (x + 230, y + box_height), (0, 0, 0), -1)
+    cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
+    
+    # Instructions
+    font_scale = 0.5
+    line_height = 25
+    y_text = y + 20
+    
+    if is_paused:
+        instructions = [
+            "PAUSED",
+            "SPACE - Resume",
+            "Letter - Switch letter",
+            "SHIFT+D - Discard",
+            "SHIFT+S - Save",
+            "ESC - Save & Quit"
+        ]
+    else:
+        instructions = [
+            "COLLECTING",
+            "SPACE - Pause",
+            "SHIFT+D - Discard",
+            "ESC - Quit"
+        ]
+    
+    for i, text in enumerate(instructions):
+        color = (0, 255, 255) if i == 0 else (255, 255, 255)
+        cv2.putText(image, text, (x + 10, y_text + i * line_height),
+                   cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, 1)
+    
+    return image
+
+def draw_text(image, text, position, font_size=20, color=(255, 255, 255), 
+              font_path=None):
+    """
+    Draw text with Unicode support using PIL/Pillow.
+    
+    Args:
+        image: OpenCV image (BGR format)
+        text: Text to draw (supports full Unicode)
+        position: (x, y) tuple for text position
+        font_size: Font size in points
+        color: BGR tuple (OpenCV format)
+        font_path: Optional path to TTF file (uses bundled DejaVu Sans if None)
+    
+    Returns:
+        image: Modified image with text drawn
+    """
+    from PIL import Image, ImageDraw, ImageFont
+    from pathlib import Path
+    
+    # Convert BGR to RGB for PIL
+    pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(pil_image)
+    
+    # Load font
+    if font_path is None:
+        # Try bundled font
+        bundled_font = Path(__file__).parent.parent.parent / "assets" / "fonts" / "DejaVuSans.ttf"
+        font_path = str(bundled_font) if bundled_font.exists() else None
+    
+    try:
+        if font_path:
+            font = ImageFont.truetype(font_path, font_size)
+        else:
+            font = ImageFont.load_default()
+    except Exception:
+        font = ImageFont.load_default()
+    
+    # Convert BGR to RGB for PIL
+    color_rgb = (color[2], color[1], color[0])
+    
+    draw.text(position, text, font=font, fill=color_rgb)
+    
+    # Convert back to BGR for OpenCV
+    return cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
