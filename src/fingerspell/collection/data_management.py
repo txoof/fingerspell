@@ -215,3 +215,42 @@ def discard_samples(temp_filename, alphabet, label_map, collected_per_letter):
     print(f"Discarded {discard_count} samples. Remaining for '{target_letter}': {collected_per_letter[target_letter]}")
     
     return collected_per_letter
+
+def draw_letter_status(image, alphabet, collected_per_letter, targets, dynamic_letters):
+    """
+    Draw letter status with color coding and checkboxes.
+    
+    Args:
+        image: OpenCV image to draw on
+        alphabet: List of letters in order
+        collected_per_letter: Dict mapping letter -> count
+        targets: Dict mapping letter -> target count
+        dynamic_letters: Set of dynamic letters
+    
+    Returns:
+        image: Image with letter status drawn
+    """
+    h = image.shape[0]
+    y_start = h - 80
+    
+    # Semi-transparent background
+    overlay = image.copy()
+    cv2.rectangle(overlay, (10, y_start), (image.shape[1] - 10, h - 10), (0, 0, 0), -1)
+    cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
+    
+    # Build status text
+    text = ""
+    for letter in alphabet:
+        count = collected_per_letter.get(letter, 0)
+        target = targets.get(letter, 0)
+        is_complete = count >= target
+        
+        # Checkbox: ☑ for complete, ☐ for incomplete
+        checkbox = chr(0x2611) if is_complete else chr(0x2610)
+        text += f"{checkbox}{letter}({count}) "
+    
+    # Draw text (may need to wrap if too long)
+    cv2.putText(image, text, (20, y_start + 30),
+               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+    
+    return image
