@@ -7,6 +7,8 @@ Handles alphabet input processing, validation, and label mapping.
 import cv2
 # Note: In production, use: from src.fingerspell.ui.common import draw_modal_overlay
 from src.fingerspell.ui.common import draw_modal_overlay
+from src.fingerspell.ui.common import draw_modal_overlay, draw_modal_input
+
 
 
 def clean_alphabet(raw_input):
@@ -101,3 +103,86 @@ def show_validation_warnings(alphabet):
     
     cap.release()
     cv2.destroyAllWindows()
+
+def get_text_input(prompt, validation_fn=None, default_value="", window_name="Input"):
+    """
+    Get text input from user via camera interface.
+    
+    Displays modal overlay with prompt and accumulates keyboard input.
+    Handles ENTER to confirm, BACKSPACE to delete (cross-platform), ESC for default/cancel.
+    
+    Args:
+        prompt: Prompt text to show user
+        validation_fn: Optional function(char, current_input) -> bool to validate each character
+        default_value: Default value if ESC pressed or empty ENTER
+        window_name: OpenCV window name
+    
+    Returns:
+        str: User input string, or None if validation_fn rejects ENTER
+    
+    Example:
+        # Simple input
+        alphabet = get_text_input("Enter alphabet:", default_value="ABC")
+        
+        # With validation
+        def only_letters(char, current):
+            return char.isalpha()
+        
+        result = get_text_input("Letters only:", validation_fn=only_letters)
+    """
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    
+    current_input = ""
+    error_msg = None
+    
+    print(f"\n{prompt}")
+    if default_value:
+        print(f"(Default: {default_value})")
+    
+    while True:
+        ret, image = cap.read()
+        if not ret:
+            cap.release()
+            cv2.destroyAllWindows()
+            return None
+        
+        image = cv2.flip(image, 1)
+        
+        # Show current input or default
+        display = current_input if current_input else f"[{default_value}]" if default_value else ""
+        image = draw_modal_input(image, prompt, display, error_msg)
+        
+        cv2.imshow(window_name, image)
+        
+        key = cv2.waitKey(1)
+        
+        if key == 27:  # ESC - use default
+            cap.release()
+            cv2.destroyAllWindows()
+            return default_value
+        
+        elif key == 13:  # ENTER - confirm
+            result = current_input if current_input else default_value
+            cap.release()
+            cv2.destroyAllWindows()
+            return result
+        
+        elif key == 8 or key == 127:  # BACKSPACE (cross-platform)
+            current_input = current_input[:-1]
+            error_msg = None
+        
+        elif 32 <= key <= 126:  # Printable character
+            char = chr(key).upper()
+            
+            # Validate if function provided
+            if validation_fn is None or validation_fn(char, current_input):
+                current_input += char
+                error_msg = None
+            else:
+                error_msg = f"'{char}' not allowed"
+    
+    cap.release()
+    cv2.destroyAllWindows()
+    return current_input
