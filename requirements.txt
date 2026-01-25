@@ -28,3 +28,6 @@ joblib
 
 # Testing
 pytest
+
+# Font Rendering and Graphics
+pillow
