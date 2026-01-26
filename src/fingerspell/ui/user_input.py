@@ -62,7 +62,7 @@ def create_label_mapping(alphabet_list):
     return {char: idx for idx, char in enumerate(sorted_alphabet)}
 
 
-def show_validation_warnings(alphabet):
+def show_validation_warnings(alphabet, cap=None, window_name='Validation Warning'):
     """
     Show warnings for non-standard characters in alphabet.
     
@@ -71,6 +71,8 @@ def show_validation_warnings(alphabet):
     
     Args:
         alphabet: List of characters to validate
+        cap: Optional existing cv2.VideoCapture to reuse (if None, creates new one)
+        window_name: OpenCV window name
     
     Returns:
         None (displays warning via camera if needed)
@@ -80,7 +82,10 @@ def show_validation_warnings(alphabet):
     if not non_standard:
         return  # No warnings needed
     
-    cap = cv2.VideoCapture(0)
+    # Use provided camera or create new one
+    owns_camera = (cap is None)
+    if owns_camera:
+        cap = cv2.VideoCapture(0)
     
     warning_text = f"Found non-standard characters: {', '.join(non_standard)}. Models work best with letters only."
     instructions = "Press any key to continue."
@@ -96,15 +101,16 @@ def show_validation_warnings(alphabet):
         image = cv2.flip(image, 1)
         image = draw_modal_overlay(image, full_text, position='center')
         
-        cv2.imshow('Validation Warning', image)
+        cv2.imshow(window_name, image)
         
         if cv2.waitKey(1) != -1:  # Any key pressed
             break
     
-    cap.release()
-    cv2.destroyAllWindows()
+    if owns_camera:
+        cap.release()
+        cv2.destroyAllWindows()
 
-def get_text_input(prompt, validation_fn=None, default_value="", window_name="Input"):
+def get_text_input(prompt, validation_fn=None, default_value="", window_name="Input", cap=None):
     """
     Get text input from user via camera interface.
     
@@ -116,6 +122,7 @@ def get_text_input(prompt, validation_fn=None, default_value="", window_name="In
         validation_fn: Optional function(char, current_input) -> bool to validate each character
         default_value: Default value if ESC pressed or empty ENTER
         window_name: OpenCV window name
+        cap: Optional existing cv2.VideoCapture to reuse (if None, creates new one)
     
     Returns:
         str: User input string, or None if validation_fn rejects ENTER
@@ -130,9 +137,12 @@ def get_text_input(prompt, validation_fn=None, default_value="", window_name="In
         
         result = get_text_input("Letters only:", validation_fn=only_letters)
     """
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    # Use provided camera or create new one
+    owns_camera = (cap is None)
+    if owns_camera:
+        cap = cv2.VideoCapture(0)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     
     current_input = ""
     error_msg = None
@@ -144,8 +154,9 @@ def get_text_input(prompt, validation_fn=None, default_value="", window_name="In
     while True:
         ret, image = cap.read()
         if not ret:
-            cap.release()
-            cv2.destroyAllWindows()
+            if owns_camera:
+                cap.release()
+                cv2.destroyAllWindows()
             return None
         
         image = cv2.flip(image, 1)
@@ -159,14 +170,16 @@ def get_text_input(prompt, validation_fn=None, default_value="", window_name="In
         key = cv2.waitKey(1)
         
         if key == 27:  # ESC - use default
-            cap.release()
-            cv2.destroyAllWindows()
+            if owns_camera:
+                cap.release()
+                cv2.destroyAllWindows()
             return default_value
         
         elif key == 13:  # ENTER - confirm
             result = current_input if current_input else default_value
-            cap.release()
-            cv2.destroyAllWindows()
+            if owns_camera:
+                cap.release()
+                cv2.destroyAllWindows()
             return result
         
         elif key == 8 or key == 127:  # BACKSPACE (cross-platform)
@@ -183,6 +196,7 @@ def get_text_input(prompt, validation_fn=None, default_value="", window_name="In
             else:
                 error_msg = f"'{char}' not allowed"
     
-    cap.release()
-    cv2.destroyAllWindows()
+    if owns_camera:
+        cap.release()
+        cv2.destroyAllWindows()
     return current_input
