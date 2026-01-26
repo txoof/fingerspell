@@ -51,7 +51,8 @@ def draw_instructions(image, is_paused, position='topright', project_root='./'):
         first_line_color=(0, 255, 255),
         color=(255, 255, 255),
         position=position,
-        project_root=project_root
+        project_root=project_root,
+        wrap=False
     )
 
     return image
