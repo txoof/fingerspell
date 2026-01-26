@@ -7,11 +7,20 @@ through sample collection to final data export.
 
 import csv
 import tempfile
+import numpy as np
 import mediapipe as mp
 from collections import deque
 import cv2
-from src.fingerspell.ui.common import draw_modal_input, draw_modal_overlay
+from src.fingerspell.ui.common import (
+    draw_modal_input, 
+    draw_modal_overlay,
+    draw_landmarks,
+    draw_progress_bar,
+    draw_instructions
+)
 from src.fingerspell.ui.user_input import clean_alphabet, get_text_input, create_label_mapping
+from src.fingerspell.collection.data_management import save_final_data, discard_samples, draw_letter_status
+from src.fingerspell.core.landmarks import calc_landmark_list, pre_process_landmark
 
 def get_alphabet_configuration():
     """Get alphabet from user."""
@@ -168,9 +177,6 @@ def run_collection_loop(state):
     Args:
         state: Dict from initialize_collection() with all necessary variables
     """
-    from src.fingerspell.core.landmarks import calc_landmark_list, pre_process_landmark
-    from src.fingerspell.ui.common import draw_landmarks, draw_progress_bar, draw_instructions
-    from src.fingerspell.collection.data_management import draw_letter_status, discard_samples, save_final_data
     
     # Unpack state
     alphabet = state['alphabet']
@@ -193,12 +199,15 @@ def run_collection_loop(state):
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     
+
+
     while True:
         ret, image = cap.read()
         if not ret:
             break
         
         image = cv2.flip(image, 1)
+
         
         if is_paused:
             # Show modal when paused
