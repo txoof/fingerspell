@@ -288,7 +288,7 @@ def run_collection_loop(state):
             # Draw UI
             target = targets[current_letter]
             current_count = collected_per_letter[current_letter]
-            image = draw_progress_bar(image, current_count, target, current_letter, y_position=120)
+            image = draw_progress_bar(image, current_count, target, current_letter, y_position=120, project_root=project_root)
             image = draw_instructions(image, is_paused=False, position='topright', project_root=project_root)
             image = draw_letter_status(image, alphabet, collected_per_letter, targets, dynamic_letters)
         

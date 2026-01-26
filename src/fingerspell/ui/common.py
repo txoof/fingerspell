@@ -301,73 +301,148 @@ def draw_landmarks(image, landmark_point):
     return image
 
 
-def draw_progress_bar(image, current_count, target, letter, y_position=60):
+def draw_progress_bar(
+    image,
+    current_count,
+    target,
+    letter,
+    y_position=60,
+    project_root=None
+):
     """
-    Draw progress bar for current letter with auto-sized text box.
+    Draw progress bar for current letter and render the status text using draw_text_window.
     """
     bar_x = 20
     bar_width = 400
     bar_height = 30
-    
+
     # Calculate progress
-    progress = min(1.0, current_count / target) if target > 0 else 0
-    
+    progress = min(1.0, current_count / target) if target > 0 else 0.0
+
     # Build text
-    text = f"{letter}: {current_count}/{target} ({progress*100:.1f}%)"
-    
-    # Measure text to size the box
+    text = f'{letter}: {current_count}/{target} ({progress * 100:.1f}%)'
+
     font_size = 24
-    bundled_font = Path("../assets/fonts/DejaVuSans.ttf")
-    try:
-        font = ImageFont.truetype(str(bundled_font), font_size)
-    except:
-        font = ImageFont.load_default()
-    
-    pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    draw_obj = ImageDraw.Draw(pil_image)
-    bbox = draw_obj.textbbox((0, 0), text, font=font)
-    text_height = bbox[3] - bbox[1]
-    
-    # Calculate text box dimensions
-    padding_vertical = 10
-    text_box_height = text_height + padding_vertical * 2
-    
-    # Draw semi-transparent background box for text
-    overlay = image.copy()
-    cv2.rectangle(overlay, (bar_x, y_position - text_box_height - 5), 
-                 (bar_x + bar_width, y_position - 5), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.8, image, 0.2, 0, image)
-    
-    # Text ABOVE the bar, centered vertically in box
-    text_y = y_position - text_box_height - 5 + padding_vertical
-    image = draw_text(image, text, (bar_x + 10, text_y),
-                     font_size=font_size, color=(255, 255, 255))
-    
+
+    # Place text window above the bar
+    text_y = max(0, y_position - (font_size * 2) - 20)
+
+    image = draw_text_window(
+        image=image,
+        text=text,
+        font_size=font_size,
+        first_line_color=(0, 255, 255),
+        color=(0, 255, 255),
+        position=(bar_x, text_y),
+        margin=0,
+        padding=10,
+        bg_color=(0, 0, 0),
+        bg_alpha=0.8,
+        border_color=(100, 100, 100),
+        project_root=project_root,
+        wrap=False
+    )
+
     # Progress bar background
-    cv2.rectangle(image, (bar_x, y_position), 
-                 (bar_x + bar_width, y_position + bar_height),
-                 (80, 80, 80), -1)
-    
+    cv2.rectangle(
+        image,
+        (bar_x, y_position),
+        (bar_x + bar_width, y_position + bar_height),
+        (80, 80, 80),
+        -1
+    )
+
     # Fill based on progress
     fill_width = int(bar_width * progress)
-    
-    # Color: green if complete, yellow if in progress
-    if progress >= 1.0:
-        fill_color = (0, 255, 0)
-    else:
-        fill_color = (0, 255, 255)
-    
+    fill_color = (0, 255, 0) if progress >= 1.0 else (0, 255, 255)
+
     if fill_width > 0:
-        cv2.rectangle(image, (bar_x, y_position),
-                     (bar_x + fill_width, y_position + bar_height),
-                     fill_color, -1)
-    
+        cv2.rectangle(
+            image,
+            (bar_x, y_position),
+            (bar_x + fill_width, y_position + bar_height),
+            fill_color,
+            -1
+        )
+
     # Border
-    cv2.rectangle(image, (bar_x, y_position),
-                 (bar_x + bar_width, y_position + bar_height),
-                 (200, 200, 200), 2)
-    
+    cv2.rectangle(
+        image,
+        (bar_x, y_position),
+        (bar_x + bar_width, y_position + bar_height),
+        (200, 200, 200),
+        2
+    )
+
     return image
+
+# def draw_progress_bar(image, current_count, target, letter, y_position=60):
+#     """
+#     Draw progress bar for current letter with auto-sized text box.
+#     """
+#     bar_x = 20
+#     bar_width = 400
+#     bar_height = 30
+    
+#     # Calculate progress
+#     progress = min(1.0, current_count / target) if target > 0 else 0
+    
+#     # Build text
+#     text = f"{letter}: {current_count}/{target} ({progress*100:.1f}%)"
+    
+#     # Measure text to size the box
+#     font_size = 24
+#     bundled_font = Path("../assets/fonts/DejaVuSans.ttf")
+#     try:
+#         font = ImageFont.truetype(str(bundled_font), font_size)
+#     except:
+#         font = ImageFont.load_default()
+    
+#     pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+#     draw_obj = ImageDraw.Draw(pil_image)
+#     bbox = draw_obj.textbbox((0, 0), text, font=font)
+#     text_height = bbox[3] - bbox[1]
+    
+#     # Calculate text box dimensions
+#     padding_vertical = 10
+#     text_box_height = text_height + padding_vertical * 2
+    
+#     # Draw semi-transparent background box for text
+#     overlay = image.copy()
+#     cv2.rectangle(overlay, (bar_x, y_position - text_box_height - 5), 
+#                  (bar_x + bar_width, y_position - 5), (0, 0, 0), -1)
+#     cv2.addWeighted(overlay, 0.8, image, 0.2, 0, image)
+    
+#     # Text ABOVE the bar, centered vertically in box
+#     text_y = y_position - text_box_height - 5 + padding_vertical
+#     image = draw_text(image, text, (bar_x + 10, text_y),
+#                      font_size=font_size, color=(255, 255, 255))
+    
+#     # Progress bar background
+#     cv2.rectangle(image, (bar_x, y_position), 
+#                  (bar_x + bar_width, y_position + bar_height),
+#                  (80, 80, 80), -1)
+    
+#     # Fill based on progress
+#     fill_width = int(bar_width * progress)
+    
+#     # Color: green if complete, yellow if in progress
+#     if progress >= 1.0:
+#         fill_color = (0, 255, 0)
+#     else:
+#         fill_color = (0, 255, 255)
+    
+#     if fill_width > 0:
+#         cv2.rectangle(image, (bar_x, y_position),
+#                      (bar_x + fill_width, y_position + bar_height),
+#                      fill_color, -1)
+    
+#     # Border
+#     cv2.rectangle(image, (bar_x, y_position),
+#                  (bar_x + bar_width, y_position + bar_height),
+#                  (200, 200, 200), 2)
+    
+#     return image
 
 def draw_text_window(
     image,
