@@ -13,53 +13,128 @@ from PIL import Image, ImageDraw, ImageFont
 from src.fingerspell.ui.common import draw_modal_input, draw_modal_overlay, draw_text, draw_text_window
 
 
-def save_final_data(temp_filename, alphabet, label_map):
+def save_final_data(temp_filename, alphabet, label_map, dynamic_letters):
     """
-    Save final training data to Desktop.
+    Save final training data to Desktop, split into static and dynamic files.
     
-    Strips sample_id column from temporary collection file and saves
-    to a timestamped folder on the Desktop with label mapping.
+    Reads combined collection data and separates into:
+    - Static letters: 43 columns (label + 42 landmarks)
+    - Dynamic letters: 85 columns (label + 42 landmarks + 42 deltas)
+    
+    Each file gets continuous label indices (0, 1, 2...) with corresponding label files.
     
     Args:
         temp_filename: Path to temporary CSV file with sample_id column
         alphabet: List of characters in the alphabet
-        label_map: Dict mapping characters to label indices
+        label_map: Dict mapping characters to original label indices
+        dynamic_letters: Set of dynamic letter characters
     
     Returns:
         str: Path to output directory if save successful, None if no data to save
     """
     # Read temp file manually to handle variable column counts
-    # (static rows have 44 columns, dynamic rows have 86 columns)
     rows = []
-    with open(temp_filename, 'r') as f:
-        reader = csv.reader(f)
-        for row in reader:
-            # Strip sample_id (first column), keep rest
-            rows.append(row[1:])
+    try:
+        with open(temp_filename, 'r', newline='', encoding='utf-8', errors='replace') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                # Skip empty rows or rows with NUL bytes
+                if not row or any('\x00' in cell for cell in row):
+                    continue
+                # Strip sample_id (first column), keep rest
+                rows.append(row[1:])
+    except Exception as e:
+        print(f"Error reading temp file: {e}")
+        return None
     
     # Check if we have any data
     if len(rows) == 0:
         return None
     
-    # Save to Desktop in timestamped folder
+    # Separate static and dynamic rows
+    static_rows = []
+    dynamic_rows = []
+    
+    for row in rows:
+        col_count = len(row)
+        label_idx = int(row[0])
+        
+        # Find which letter this label corresponds to
+        letter = None
+        for char, idx in label_map.items():
+            if idx == label_idx:
+                letter = char
+                break
+        
+        if letter is None:
+            raise ValueError(f"Unknown label index: {label_idx}")
+        
+        # Validate column count and categorize
+        if letter in dynamic_letters:
+            # Dynamic: label + 42 landmarks + 42 deltas = 85 columns
+            if col_count != 85:
+                raise ValueError(f"Dynamic letter '{letter}' has {col_count} columns, expected 85")
+            dynamic_rows.append((letter, row))
+        else:
+            # Static: label + 42 landmarks = 43 columns
+            if col_count != 43:
+                raise ValueError(f"Static letter '{letter}' has {col_count} columns, expected 43")
+            static_rows.append((letter, row))
+    
+    # Create output directory
     desktop = Path.home() / "Desktop"
     output_dir = desktop / f"fingerspell_data_{datetime.now().strftime('%Y%m%d_%H%M')}"
     output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Save keypoints
-    filepath = output_dir / "keypoint_data.csv"
-    with open(filepath, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerows(rows)
+    # Process static data
+    if static_rows:
+        # Get unique static letters in sorted order
+        static_letters = sorted(set(letter for letter, _ in static_rows), key=lambda x: ord(x))
+        static_label_map = {char: idx for idx, char in enumerate(static_letters)}
+        
+        # Relabel rows
+        relabeled_static = []
+        for letter, row in static_rows:
+            new_label = static_label_map[letter]
+            relabeled_static.append([new_label] + row[1:])  # Replace old label with new
+        
+        # Save static keypoints
+        static_path = output_dir / "keypoint_data_static.csv"
+        with open(static_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(relabeled_static)
+        
+        # Save static labels
+        static_label_path = output_dir / "keypoint_classifier_label_static.csv"
+        with open(static_label_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            for letter in static_letters:
+                writer.writerow([letter])
     
-    # Save label mapping (sorted by label index)
-    label_filepath = output_dir / "keypoint_classifier_label.csv"
-    
-    sorted_labels = sorted(label_map.items(), key=lambda x: x[1])
-    with open(label_filepath, 'w', newline='') as f:
-        writer = csv.writer(f)
-        for letter, idx in sorted_labels:
-            writer.writerow([letter])
+    # Process dynamic data
+    if dynamic_rows:
+        # Get unique dynamic letters in sorted order
+        dynamic_letters_list = sorted(set(letter for letter, _ in dynamic_rows), key=lambda x: ord(x))
+        dynamic_label_map = {char: idx for idx, char in enumerate(dynamic_letters_list)}
+        
+        # Relabel rows
+        relabeled_dynamic = []
+        for letter, row in dynamic_rows:
+            new_label = dynamic_label_map[letter]
+            relabeled_dynamic.append([new_label] + row[1:])  # Replace old label with new
+        
+        # Save dynamic keypoints
+        dynamic_path = output_dir / "keypoint_data_dynamic.csv"
+        with open(dynamic_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(relabeled_dynamic)
+        
+        # Save dynamic labels
+        dynamic_label_path = output_dir / "keypoint_classifier_label_dynamic.csv"
+        with open(dynamic_label_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            for letter in dynamic_letters_list:
+                writer.writerow([letter])
     
     return str(output_dir)
 
