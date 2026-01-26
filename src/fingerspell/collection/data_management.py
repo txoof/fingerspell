@@ -26,10 +26,8 @@ def save_final_data(temp_filename, alphabet, label_map):
         label_map: Dict mapping characters to label indices
     
     Returns:
-        bool: True if save successful, False otherwise
+        str: Path to output directory if save successful, None if no data to save
     """
-    print("Reading temp file...")
-    
     # Read temp file manually to handle variable column counts
     # (static rows have 44 columns, dynamic rows have 86 columns)
     rows = []
@@ -39,7 +37,9 @@ def save_final_data(temp_filename, alphabet, label_map):
             # Strip sample_id (first column), keep rest
             rows.append(row[1:])
     
-    print(f"Read {len(rows)} rows")
+    # Check if we have any data
+    if len(rows) == 0:
+        return None
     
     # Save to Desktop in timestamped folder
     desktop = Path.home() / "Desktop"
@@ -52,8 +52,6 @@ def save_final_data(temp_filename, alphabet, label_map):
         writer = csv.writer(f)
         writer.writerows(rows)
     
-    print(f"Saved keypoints: {filepath}")
-    
     # Save label mapping (sorted by label index)
     label_filepath = output_dir / "keypoint_classifier_label.csv"
     
@@ -63,13 +61,10 @@ def save_final_data(temp_filename, alphabet, label_map):
         for letter, idx in sorted_labels:
             writer.writerow([letter])
     
-    print(f"Saved labels: {label_filepath}")
-    print(f"\nAll files saved to: {output_dir}")
-    
-    return True
+    return str(output_dir)
 
 
-def discard_samples(temp_filename, alphabet, label_map, collected_per_letter):
+def discard_samples(cap, temp_filename, alphabet, label_map, collected_per_letter, window_name='Data Collection'):
     """
     Interactive workflow to discard samples for a specific letter.
     
@@ -77,16 +72,17 @@ def discard_samples(temp_filename, alphabet, label_map, collected_per_letter):
     Removes samples from the temporary CSV file.
     
     Args:
+        cap: Existing cv2.VideoCapture object to reuse
         temp_filename: Path to temporary CSV file
         alphabet: List of valid characters
         label_map: Dict mapping characters to label indices
         collected_per_letter: Dict tracking samples per letter
+        window_name: Name of the window to display in
     
     Returns:
         dict: Updated collected_per_letter dict
     """
     # Step 1: Get letter to discard
-    cap = cv2.VideoCapture(0)
     letter_input = ""
     
     while True:
@@ -97,12 +93,10 @@ def discard_samples(temp_filename, alphabet, label_map, collected_per_letter):
         image = cv2.flip(image, 1)
         image = draw_modal_input(image, "Which letter to discard?", letter_input)
         
-        cv2.imshow('Discard', image)
+        cv2.imshow(window_name, image)
         key = cv2.waitKey(1)
         
         if key == 27:  # ESC - cancel
-            cap.release()
-            cv2.destroyAllWindows()
             return collected_per_letter
         elif key == 13:  # ENTER
             if letter_input in alphabet:
@@ -129,12 +123,10 @@ def discard_samples(temp_filename, alphabet, label_map, collected_per_letter):
         prompt = f"Discard how many samples of '{target_letter}'? (1-{current_count} or 'all')"
         image = draw_modal_input(image, prompt, count_input)
         
-        cv2.imshow('Discard', image)
+        cv2.imshow(window_name, image)
         key = cv2.waitKey(1)
         
         if key == 27:  # ESC - cancel
-            cap.release()
-            cv2.destroyAllWindows()
             return collected_per_letter
         elif key == 13:  # ENTER
             if count_input.lower() == 'all':
@@ -166,12 +158,10 @@ def discard_samples(temp_filename, alphabet, label_map, collected_per_letter):
         cv2.putText(image, confirm_input, (image.shape[1]//2 - 50, image.shape[0]//2 + 100),
                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
         
-        cv2.imshow('Discard', image)
+        cv2.imshow(window_name, image)
         key = cv2.waitKey(1)
         
         if key == 27:  # ESC - cancel
-            cap.release()
-            cv2.destroyAllWindows()
             return collected_per_letter
         elif key == 13:  # ENTER
             if confirm_input.lower() == 'yes':
@@ -181,9 +171,6 @@ def discard_samples(temp_filename, alphabet, label_map, collected_per_letter):
             confirm_input = confirm_input[:-1]
         elif 32 <= key <= 126:
             confirm_input += chr(key)
-    
-    cap.release()
-    cv2.destroyAllWindows()
     
     # Actually discard from CSV
     print(f"Discarding {discard_count} samples of '{target_letter}'...")
@@ -246,6 +233,64 @@ def draw_letter_status(image, alphabet, collected_per_letter, targets, dynamic_l
         wrap=True,
         fill_width=True
     )
+
+
+def show_save_confirmation(cap, window_name='Data Collection'):
+    """
+    Show modal asking user if they want to save collected data.
+    
+    Args:
+        cap: Existing cv2.VideoCapture object to reuse
+        window_name: Name of the window to display in
+    
+    Returns:
+        bool: True if user wants to save (pressed Y), False if not (pressed N or ESC)
+    """
+    message = "Save collected data?\n\nPress Y to save\nPress N or ESC to exit without saving"
+    
+    while True:
+        ret, image = cap.read()
+        if not ret:
+            return False
+        
+        image = cv2.flip(image, 1)
+        image = draw_modal_overlay(image, message, position='center')
+        
+        cv2.imshow(window_name, image)
+        
+        key = cv2.waitKey(1)
+        
+        if key == ord('Y') or key == ord('y'):
+            return True
+        elif key == ord('N') or key == ord('n') or key == 27:  # N or ESC
+            return False
+
+
+def show_save_success(cap, save_path, window_name='Data Collection'):
+    """
+    Show modal with successful save path and wait for keypress.
+    
+    Args:
+        cap: Existing cv2.VideoCapture object to reuse
+        save_path: Path where data was saved
+        window_name: Name of the window to display in
+    """
+    message = f"Data saved successfully!\n\nLocation:\n{save_path}\n\nPress any key to close"
+    
+    while True:
+        ret, image = cap.read()
+        if not ret:
+            return
+        
+        image = cv2.flip(image, 1)
+        image = draw_modal_overlay(image, message, position='center', width_percent=80)
+        
+        cv2.imshow(window_name, image)
+        
+        key = cv2.waitKey(1)
+        
+        if key != -1:  # Any key pressed
+            return
 
 # def draw_letter_status(image, alphabet, collected_per_letter, targets, dynamic_letters):
 #     """
