@@ -18,15 +18,15 @@ def run_collection_mode(project_root):
 
 def run_training_mode(project_root):
     """Run model training workflow."""
-    print("\nStarting training mode...")
-    # TODO: Implement training workflow
-    print("Training mode - not yet implemented")
-    input("Press ENTER to return to menu...")
-
+    # print("\nStarting training mode...")
+    # # TODO: Implement training workflow
+    # print("Training mode - not yet implemented")
+    # input("Press ENTER to return to menu...")
+    pass
 
 def run_recognition_mode(project_root):
     """Run real-time recognition."""
-    print("\nStarting recognition mode...")
+    # print("\nStarting recognition mode...")
     
     # Get model paths
     static_model = project_root / 'models' / 'ngt_static_classifier.pkl'
@@ -37,12 +37,12 @@ def run_recognition_mode(project_root):
 
 def main(project_root):
     """Main application entry point."""
-    print("NGT Fingerspelling System")
+    # print("NGT Fingerspelling System")
     
     while True:
         # Show main menu
         menu = Menu(
-            title="NGT Fingerspelling System",
+            title="Fingerspelling System",
             options=[
                 ('1', 'Collect Training Data'),
                 ('2', 'Train Models'),
@@ -50,7 +50,7 @@ def main(project_root):
                 ('', ''),
                 ('', 'ESC - Quit')
             ],
-            window_name="NGT Fingerspelling"
+            window_name="Fingerspelling"
         )
         
         choice = menu.run()
@@ -61,6 +61,7 @@ def main(project_root):
         
         elif choice == '1':
             run_collection_mode(project_root)
+            
         
         elif choice == '2':
             run_training_mode(project_root)
