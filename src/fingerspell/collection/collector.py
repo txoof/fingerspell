@@ -63,13 +63,22 @@ def draw_instructions(image, is_paused, position='topright', project_root='./'):
 
     return image
 
-def get_alphabet_configuration():
-    """Get alphabet from user."""
+def get_alphabet_configuration(cap=None, window_name="Alphabet Configuration"):
+    """
+    Get alphabet from user.
     
+    Args:
+        cap: Optional existing cv2.VideoCapture to reuse
+        window_name: OpenCV window name
+    
+    Returns:
+        list: Cleaned alphabet or None if cancelled
+    """
     alphabet_input = get_text_input(
         prompt="Enter alphabet (default: A-Z):",
         default_value="ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-        window_name="Alphabet Configuration"
+        window_name=window_name,
+        cap=cap
     )
     
     if alphabet_input is None:
@@ -79,12 +88,14 @@ def get_alphabet_configuration():
     
     return alphabet
 
-def get_dynamic_letters_configuration(alphabet):
+def get_dynamic_letters_configuration(alphabet, cap=None, window_name="Dynamic Letters"):
     """
     Get dynamic letters from user via camera interface.
     
     Args:
         alphabet: List of valid alphabet characters
+        cap: Optional existing cv2.VideoCapture to reuse
+        window_name: OpenCV window name
     
     Returns:
         set: Set of dynamic letters, or empty set if none/cancelled
@@ -97,7 +108,8 @@ def get_dynamic_letters_configuration(alphabet):
         prompt="Enter dynamic letters (ESC for none):",
         validation_fn=validate_in_alphabet,
         default_value="",
-        window_name="Dynamic Letters"
+        window_name=window_name,
+        cap=cap
     )
     
     if dynamic_input is None:
@@ -107,20 +119,25 @@ def get_dynamic_letters_configuration(alphabet):
     
     return dynamic_letters
 
-def show_configuration_summary(alphabet, dynamic_letters):
+def show_configuration_summary(alphabet, dynamic_letters, cap=None, window_name='Configuration Summary'):
     """
     Show configuration summary and wait for user to start.
     
     Args:
         alphabet: List of alphabet characters
         dynamic_letters: Set of dynamic letters
+        cap: Optional existing cv2.VideoCapture to reuse
+        window_name: OpenCV window name
     
     Returns:
         bool: True if user wants to proceed, False if cancelled
     """
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    # Use provided camera or create new one
+    owns_camera = (cap is None)
+    if owns_camera:
+        cap = cv2.VideoCapture(0)
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     
     # Build summary text
     summary = "Configuration Complete\n\n"
@@ -135,24 +152,27 @@ def show_configuration_summary(alphabet, dynamic_letters):
     while True:
         ret, image = cap.read()
         if not ret:
-            cap.release()
-            cv2.destroyAllWindows()
+            if owns_camera:
+                cap.release()
+                cv2.destroyAllWindows()
             return False
         
         image = cv2.flip(image, 1)
         image = draw_modal_overlay(image, summary, position='center')
         
-        cv2.imshow('Configuration Summary', image)
+        cv2.imshow(window_name, image)
         
         key = cv2.waitKey(1)
         
         if key == 27:  # ESC - cancel
-            cap.release()
-            cv2.destroyAllWindows()
+            if owns_camera:
+                cap.release()
+                cv2.destroyAllWindows()
             return False
         elif key == 32:  # SPACE - proceed
-            cap.release()
-            cv2.destroyAllWindows()
+            if owns_camera:
+                cap.release()
+                cv2.destroyAllWindows()
             return True
         
 
@@ -233,13 +253,9 @@ def run_collection_loop(state):
     is_paused = state['is_paused']
     landmark_buffer = state['landmark_buffer']
     project_root = state['project_root']
+    cap = state['cap']  # Use camera from state
     
     BUFFER_SIZE = 5
-    
-    # Camera setup
-    cap = cv2.VideoCapture(0)
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     
 
 
@@ -309,9 +325,12 @@ def run_collection_loop(state):
             if total_samples > 0:
                 # Ask user if they want to save (reuse camera)
                 if show_save_confirmation(cap, 'Data Collection'):
-                    # Save data
+                    # Close temp file before reading
                     temp_file.flush()
-                    save_path = save_final_data(temp_file.name, alphabet, label_map)
+                    temp_file.close()
+                    
+                    # Save data
+                    save_path = save_final_data(temp_file.name, alphabet, label_map, dynamic_letters)
                     
                     if save_path:
                         # Show success message (reuse camera)
@@ -336,10 +355,19 @@ def run_collection_loop(state):
                 # Update total
                 sample_id = sum(collected_per_letter.values())
         elif key == ord('S'):  # SHIFT+S - save and continue
+            # Close temp file before reading
             temp_file.flush()
-            save_path = save_final_data(temp_file.name, alphabet, label_map)
+            temp_file.close()
+            
+            # Save data
+            save_path = save_final_data(temp_file.name, alphabet, label_map, dynamic_letters)
+            
             if save_path:
                 show_save_success(cap, save_path, 'Data Collection')
+            
+            # Reopen temp file for continued collection
+            temp_file = open(temp_file.name, 'a', newline='')
+            csv_writer = csv.writer(temp_file)
     
     # Cleanup
     cap.release()
@@ -354,24 +382,39 @@ def run_collection_loop(state):
 def run_collection(project_root):
     """Run the data collection workflow."""
     
+    # Create single camera for entire configuration process
+    cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+    
+    window_name = "Data Collection"
+    
     # Step 1: Get alphabet
-    alphabet = get_alphabet_configuration()
+    alphabet = get_alphabet_configuration(cap, window_name)
     if alphabet is None:
+        cap.release()
+        cv2.destroyAllWindows()
         return
     
     # Step 2: Get dynamic letters
-    dynamic_letters = get_dynamic_letters_configuration(alphabet)
+    dynamic_letters = get_dynamic_letters_configuration(alphabet, cap, window_name)
     
     # Step 3: Show summary and confirm
-    if not show_configuration_summary(alphabet, dynamic_letters):
+    if not show_configuration_summary(alphabet, dynamic_letters, cap, window_name):
+        cap.release()
+        cv2.destroyAllWindows()
         return
     
+    # Camera stays open - don't release it!
     # Step 4: Initialize collection
     state = initialize_collection(alphabet, dynamic_letters)
     if state is None:
+        cap.release()
+        cv2.destroyAllWindows()
         return
     state['project_root'] = project_root
+    state['cap'] = cap  # Pass camera to collection loop
     
-    # Step 5: Run collection loop
+    # Step 5: Run collection loop (will handle camera cleanup)
     temp_file, alphabet, label_map = run_collection_loop(state)
 
