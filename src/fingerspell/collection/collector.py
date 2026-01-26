@@ -16,11 +16,45 @@ from src.fingerspell.ui.common import (
     draw_modal_overlay,
     draw_landmarks,
     draw_progress_bar,
-    draw_instructions
+    draw_text_window
 )
 from src.fingerspell.ui.user_input import clean_alphabet, get_text_input, create_label_mapping
 from src.fingerspell.collection.data_management import save_final_data, discard_samples, draw_letter_status
 from src.fingerspell.core.landmarks import calc_landmark_list, pre_process_landmark
+
+def draw_instructions(image, is_paused, position='topright', project_root='./'):
+    """
+    Draw on-screen instructions using draw_text_window.
+    """
+
+    if is_paused:
+        instructions = [
+            'PAUSED',
+            'SPACE - Resume',
+            'Letter - Switch',
+            'SHIFT+D - Discard',
+            'SHIFT+S - Save',
+            'ESC - Quit & Save'
+        ]
+    else:
+        instructions = [
+            'COLLECTING',
+            'SPACE - Pause',
+            'SHIFT+D - Discard',
+            'ESC - Quit'
+        ]
+
+    image = draw_text_window(
+        image=image,
+        text=instructions,
+        font_size=20,
+        first_line_color=(0, 255, 255),
+        color=(255, 255, 255),
+        position=position,
+        project_root=project_root
+    )
+
+    return image
 
 def get_alphabet_configuration():
     """Get alphabet from user."""
@@ -191,6 +225,7 @@ def run_collection_loop(state):
     current_letter = state['current_letter']
     is_paused = state['is_paused']
     landmark_buffer = state['landmark_buffer']
+    project_root = state['project_root']
     
     BUFFER_SIZE = 5
     
@@ -253,7 +288,7 @@ def run_collection_loop(state):
             target = targets[current_letter]
             current_count = collected_per_letter[current_letter]
             image = draw_progress_bar(image, current_count, target, current_letter, y_position=120)
-            image = draw_instructions(image, is_paused=False, position='topright')
+            image = draw_instructions(image, is_paused=False, position='topright', project_root=project_root)
             image = draw_letter_status(image, alphabet, collected_per_letter, targets, dynamic_letters)
         
         cv2.imshow('Data Collection', image)
@@ -310,6 +345,7 @@ def run_collection(project_root):
     state = initialize_collection(alphabet, dynamic_letters)
     if state is None:
         return
+    state['project_root'] = project_root
     
     # Step 5: Run collection loop
     run_collection_loop(state)
