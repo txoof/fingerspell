@@ -8,6 +8,7 @@ from pathlib import Path
 from src.fingerspell.ui.menu import Menu
 from src.fingerspell.ui.window import run_app
 from src.fingerspell.collection.collector import run_collection
+from src.fingerspell.training.trainer import run_training_workflow
 
 
 
@@ -18,11 +19,7 @@ def run_collection_mode(project_root):
 
 def run_training_mode(project_root):
     """Run model training workflow."""
-    # print("\nStarting training mode...")
-    # # TODO: Implement training workflow
-    # print("Training mode - not yet implemented")
-    # input("Press ENTER to return to menu...")
-    pass
+    run_training_workflow(project_root)
 
 def run_recognition_mode(project_root):
     """Run real-time recognition."""
