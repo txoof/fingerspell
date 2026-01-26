@@ -19,7 +19,13 @@ from src.fingerspell.ui.common import (
     draw_text_window
 )
 from src.fingerspell.ui.user_input import clean_alphabet, get_text_input, create_label_mapping
-from src.fingerspell.collection.data_management import save_final_data, discard_samples, draw_letter_status
+from src.fingerspell.collection.data_management import (
+    save_final_data, 
+    discard_samples, 
+    draw_letter_status,
+    show_save_confirmation,
+    show_save_success
+)
 from src.fingerspell.core.landmarks import calc_landmark_list, pre_process_landmark
 
 def draw_instructions(image, is_paused, position='topright', project_root='./'):
@@ -296,7 +302,22 @@ def run_collection_loop(state):
         
         key = cv2.waitKey(1)
         
-        if key == 27:  # ESC - save and quit
+        if key == 27:  # ESC - check if we should save
+            # Check if any samples were collected
+            total_samples = sum(collected_per_letter.values())
+            
+            if total_samples > 0:
+                # Ask user if they want to save (reuse camera)
+                if show_save_confirmation(cap, 'Data Collection'):
+                    # Save data
+                    temp_file.flush()
+                    save_path = save_final_data(temp_file.name, alphabet, label_map)
+                    
+                    if save_path:
+                        # Show success message (reuse camera)
+                        show_save_success(cap, save_path, 'Data Collection')
+            
+            # Exit regardless of save decision
             break
         elif key == 32:  # SPACE - pause/resume
             is_paused = not is_paused
@@ -311,21 +332,24 @@ def run_collection_loop(state):
         elif key == ord('D'):  # SHIFT+D - discard
             if is_paused:
                 temp_file.flush()
-                collected_per_letter = discard_samples(temp_file.name, alphabet, label_map, collected_per_letter)
+                collected_per_letter = discard_samples(cap, temp_file.name, alphabet, label_map, collected_per_letter, 'Data Collection')
                 # Update total
                 sample_id = sum(collected_per_letter.values())
         elif key == ord('S'):  # SHIFT+S - save and continue
             temp_file.flush()
-            save_final_data(temp_file.name, alphabet, label_map)
+            save_path = save_final_data(temp_file.name, alphabet, label_map)
+            if save_path:
+                show_save_success(cap, save_path, 'Data Collection')
     
     # Cleanup
     cap.release()
     hands.close()
     cv2.destroyAllWindows()
     
-    # Final save
+    # Close temp file
     temp_file.close()
-    save_final_data(temp_file.name, alphabet, label_map)
+    
+    return temp_file.name, alphabet, label_map
 
 def run_collection(project_root):
     """Run the data collection workflow."""
@@ -349,4 +373,5 @@ def run_collection(project_root):
     state['project_root'] = project_root
     
     # Step 5: Run collection loop
-    run_collection_loop(state)
+    temp_file, alphabet, label_map = run_collection_loop(state)
+
