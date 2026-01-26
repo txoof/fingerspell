@@ -13,18 +13,13 @@ from PIL import Image, ImageDraw, ImageFont
 from src.fingerspell.ui.common import draw_modal_input, draw_modal_overlay, draw_text, draw_text_window
 
 
-def save_final_data(temp_filename, alphabet, label_map, dynamic_letters):
+def save_final_data(temp_filename_static, temp_filename_dynamic, alphabet, label_map, dynamic_letters):
     """
-    Save final training data to Desktop, split into static and dynamic files.
-    
-    Reads combined collection data and separates into:
-    - Static letters: 43 columns (label + 42 landmarks)
-    - Dynamic letters: 85 columns (label + 42 landmarks + 42 deltas)
-    
-    Each file gets continuous label indices (0, 1, 2...) with corresponding label files.
+    Save final training data to Desktop from already-separated temp files.
     
     Args:
-        temp_filename: Path to temporary CSV file with sample_id column
+        temp_filename_static: Path to static temp CSV file
+        temp_filename_dynamic: Path to dynamic temp CSV file
         alphabet: List of characters in the alphabet
         label_map: Dict mapping characters to original label indices
         dynamic_letters: Set of dynamic letter characters
@@ -32,54 +27,35 @@ def save_final_data(temp_filename, alphabet, label_map, dynamic_letters):
     Returns:
         str: Path to output directory if save successful, None if no data to save
     """
-    # Read temp file manually to handle variable column counts
-    rows = []
-    try:
-        with open(temp_filename, 'r', newline='', encoding='utf-8', errors='replace') as f:
-            reader = csv.reader(f)
-            for row in reader:
-                # Skip empty rows or rows with NUL bytes
-                if not row or any('\x00' in cell for cell in row):
-                    continue
-                # Strip sample_id (first column), keep rest
-                rows.append(row[1:])
-    except Exception as e:
-        print(f"Error reading temp file: {e}")
-        return None
-    
-    # Check if we have any data
-    if len(rows) == 0:
-        return None
-    
-    # Separate static and dynamic rows
+    # Read both temp files
     static_rows = []
     dynamic_rows = []
     
-    for row in rows:
-        col_count = len(row)
-        label_idx = int(row[0])
-        
-        # Find which letter this label corresponds to
-        letter = None
-        for char, idx in label_map.items():
-            if idx == label_idx:
-                letter = char
-                break
-        
-        if letter is None:
-            raise ValueError(f"Unknown label index: {label_idx}")
-        
-        # Validate column count and categorize
-        if letter in dynamic_letters:
-            # Dynamic: label + 42 landmarks + 42 deltas = 85 columns
-            if col_count != 85:
-                raise ValueError(f"Dynamic letter '{letter}' has {col_count} columns, expected 85")
-            dynamic_rows.append((letter, row))
-        else:
-            # Static: label + 42 landmarks = 43 columns
-            if col_count != 43:
-                raise ValueError(f"Static letter '{letter}' has {col_count} columns, expected 43")
-            static_rows.append((letter, row))
+    # Read static file
+    try:
+        with open(temp_filename_static, 'r', newline='', encoding='utf-8', errors='replace') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if not row or any('\x00' in cell for cell in row):
+                    continue
+                static_rows.append(row[1:])  # Strip sample_id
+    except:
+        pass
+    
+    # Read dynamic file
+    try:
+        with open(temp_filename_dynamic, 'r', newline='', encoding='utf-8', errors='replace') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if not row or any('\x00' in cell for cell in row):
+                    continue
+                dynamic_rows.append(row[1:])  # Strip sample_id
+    except:
+        pass
+    
+    # Check if we have any data
+    if len(static_rows) == 0 and len(dynamic_rows) == 0:
+        return None
     
     # Create output directory
     desktop = Path.home() / "Desktop"
@@ -88,15 +64,32 @@ def save_final_data(temp_filename, alphabet, label_map, dynamic_letters):
     
     # Process static data
     if static_rows:
-        # Get unique static letters in sorted order
-        static_letters = sorted(set(letter for letter, _ in static_rows), key=lambda x: ord(x))
+        # Extract letters from static rows and relabel
+        static_letters_from_rows = set()
+        for row in static_rows:
+            label_idx = int(row[0])
+            for char, idx in label_map.items():
+                if idx == label_idx:
+                    static_letters_from_rows.add(char)
+                    break
+        
+        # Create new label mapping for static
+        static_letters = sorted(static_letters_from_rows, key=lambda x: ord(x))
         static_label_map = {char: idx for idx, char in enumerate(static_letters)}
         
         # Relabel rows
         relabeled_static = []
-        for letter, row in static_rows:
-            new_label = static_label_map[letter]
-            relabeled_static.append([new_label] + row[1:])  # Replace old label with new
+        for row in static_rows:
+            old_label = int(row[0])
+            # Find letter for old label
+            letter = None
+            for char, idx in label_map.items():
+                if idx == old_label:
+                    letter = char
+                    break
+            if letter:
+                new_label = static_label_map[letter]
+                relabeled_static.append([new_label] + row[1:])
         
         # Save static keypoints
         static_path = output_dir / "keypoint_data_static.csv"
@@ -113,15 +106,32 @@ def save_final_data(temp_filename, alphabet, label_map, dynamic_letters):
     
     # Process dynamic data
     if dynamic_rows:
-        # Get unique dynamic letters in sorted order
-        dynamic_letters_list = sorted(set(letter for letter, _ in dynamic_rows), key=lambda x: ord(x))
+        # Extract letters from dynamic rows and relabel
+        dynamic_letters_from_rows = set()
+        for row in dynamic_rows:
+            label_idx = int(row[0])
+            for char, idx in label_map.items():
+                if idx == label_idx:
+                    dynamic_letters_from_rows.add(char)
+                    break
+        
+        # Create new label mapping for dynamic
+        dynamic_letters_list = sorted(dynamic_letters_from_rows, key=lambda x: ord(x))
         dynamic_label_map = {char: idx for idx, char in enumerate(dynamic_letters_list)}
         
         # Relabel rows
         relabeled_dynamic = []
-        for letter, row in dynamic_rows:
-            new_label = dynamic_label_map[letter]
-            relabeled_dynamic.append([new_label] + row[1:])  # Replace old label with new
+        for row in dynamic_rows:
+            old_label = int(row[0])
+            # Find letter for old label
+            letter = None
+            for char, idx in label_map.items():
+                if idx == old_label:
+                    letter = char
+                    break
+            if letter:
+                new_label = dynamic_label_map[letter]
+                relabeled_dynamic.append([new_label] + row[1:])
         
         # Save dynamic keypoints
         dynamic_path = output_dir / "keypoint_data_dynamic.csv"
@@ -139,19 +149,21 @@ def save_final_data(temp_filename, alphabet, label_map, dynamic_letters):
     return str(output_dir)
 
 
-def discard_samples(cap, temp_filename, alphabet, label_map, collected_per_letter, window_name='Data Collection'):
+def discard_samples(cap, temp_filename_static, temp_filename_dynamic, alphabet, label_map, collected_per_letter, dynamic_letters, window_name='Data Collection'):
     """
     Interactive workflow to discard samples for a specific letter.
     
     Shows camera-based modals to select letter, specify count, and confirm.
-    Removes samples from the temporary CSV file.
+    Removes samples from the appropriate temporary CSV file.
     
     Args:
         cap: Existing cv2.VideoCapture object to reuse
-        temp_filename: Path to temporary CSV file
+        temp_filename_static: Path to static temporary CSV file
+        temp_filename_dynamic: Path to dynamic temporary CSV file
         alphabet: List of valid characters
         label_map: Dict mapping characters to label indices
         collected_per_letter: Dict tracking samples per letter
+        dynamic_letters: Set of dynamic letters
         window_name: Name of the window to display in
     
     Returns:
@@ -250,14 +262,18 @@ def discard_samples(cap, temp_filename, alphabet, label_map, collected_per_lette
     # Actually discard from CSV
     print(f"Discarding {discard_count} samples of '{target_letter}'...")
     
-    # Read CSV
+    # Determine which file to modify
+    is_dynamic = target_letter in dynamic_letters
+    temp_filename = temp_filename_dynamic if is_dynamic else temp_filename_static
+    
+    # Read CSV with pandas (now we can since rows are consistent length)
     df = pd.read_csv(temp_filename, header=None)
     
     # Get label index for this letter
     target_label = label_map[target_letter]
     
     # Find all rows with this label
-    mask = df[1] == target_label  # Column 1 is label_index
+    mask = df[1] == target_label  # Column 1 is label_index (after sample_id)
     matching_indices = df[mask].index.tolist()
     
     # Remove last N samples

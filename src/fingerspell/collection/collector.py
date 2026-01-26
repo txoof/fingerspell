@@ -180,7 +180,7 @@ def initialize_collection(alphabet, dynamic_letters):
     """
     Initialize collection state.
     
-    Sets up temp file, MediaPipe, tracking dictionaries, and targets.
+    Sets up temp files (separate for static/dynamic), MediaPipe, tracking dictionaries, and targets.
     
     Args:
         alphabet: List of alphabet characters
@@ -199,9 +199,12 @@ def initialize_collection(alphabet, dynamic_letters):
     for char in alphabet:
         targets[char] = DYNAMIC_TARGET if char in dynamic_letters else STATIC_TARGET
     
-    # Create temp file
-    temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.csv', newline='')
-    csv_writer = csv.writer(temp_file)
+    # Create temp files - separate for static and dynamic
+    temp_file_static = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='_static.csv', newline='')
+    csv_writer_static = csv.writer(temp_file_static)
+    
+    temp_file_dynamic = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='_dynamic.csv', newline='')
+    csv_writer_dynamic = csv.writer(temp_file_dynamic)
     
     # Setup MediaPipe
     mp_hands = mp.solutions.hands
@@ -221,8 +224,10 @@ def initialize_collection(alphabet, dynamic_letters):
         'dynamic_letters': dynamic_letters,
         'label_map': label_map,
         'targets': targets,
-        'temp_file': temp_file,
-        'csv_writer': csv_writer,
+        'temp_file_static': temp_file_static,
+        'csv_writer_static': csv_writer_static,
+        'temp_file_dynamic': temp_file_dynamic,
+        'csv_writer_dynamic': csv_writer_dynamic,
         'hands': hands,
         'collected_per_letter': collected_per_letter,
         'sample_id': 0,
@@ -244,8 +249,10 @@ def run_collection_loop(state):
     dynamic_letters = state['dynamic_letters']
     label_map = state['label_map']
     targets = state['targets']
-    temp_file = state['temp_file']
-    csv_writer = state['csv_writer']
+    temp_file_static = state['temp_file_static']
+    csv_writer_static = state['csv_writer_static']
+    temp_file_dynamic = state['temp_file_dynamic']
+    csv_writer_dynamic = state['csv_writer_dynamic']
     hands = state['hands']
     collected_per_letter = state['collected_per_letter']
     sample_id = state['sample_id']
@@ -296,14 +303,14 @@ def run_collection_loop(state):
                         delta = [c - o for c, o in zip(current, old)]
                         
                         label_index = label_map[current_letter]
-                        csv_writer.writerow([sample_id, label_index] + current + delta)
-                        temp_file.flush()
+                        csv_writer_dynamic.writerow([sample_id, label_index] + current + delta)
+                        temp_file_dynamic.flush()
                         sample_id += 1
                         collected_per_letter[current_letter] += 1
                 else:
                     label_index = label_map[current_letter]
-                    csv_writer.writerow([sample_id, label_index] + normalized)
-                    temp_file.flush()
+                    csv_writer_static.writerow([sample_id, label_index] + normalized)
+                    temp_file_static.flush()
                     sample_id += 1
                     collected_per_letter[current_letter] += 1
             
@@ -325,12 +332,20 @@ def run_collection_loop(state):
             if total_samples > 0:
                 # Ask user if they want to save (reuse camera)
                 if show_save_confirmation(cap, 'Data Collection'):
-                    # Close temp file before reading
-                    temp_file.flush()
-                    temp_file.close()
+                    # Close both temp files before reading
+                    temp_file_static.flush()
+                    temp_file_static.close()
+                    temp_file_dynamic.flush()
+                    temp_file_dynamic.close()
                     
                     # Save data
-                    save_path = save_final_data(temp_file.name, alphabet, label_map, dynamic_letters)
+                    save_path = save_final_data(
+                        temp_file_static.name,
+                        temp_file_dynamic.name,
+                        alphabet,
+                        label_map,
+                        dynamic_letters
+                    )
                     
                     if save_path:
                         # Show success message (reuse camera)
@@ -350,34 +365,55 @@ def run_collection_loop(state):
                 landmark_buffer.clear()
         elif key == ord('D'):  # SHIFT+D - discard
             if is_paused:
-                temp_file.flush()
-                collected_per_letter = discard_samples(cap, temp_file.name, alphabet, label_map, collected_per_letter, 'Data Collection')
+                temp_file_static.flush()
+                temp_file_dynamic.flush()
+                collected_per_letter = discard_samples(
+                    cap,
+                    temp_file_static.name,
+                    temp_file_dynamic.name,
+                    alphabet,
+                    label_map,
+                    collected_per_letter,
+                    dynamic_letters,
+                    'Data Collection'
+                )
                 # Update total
                 sample_id = sum(collected_per_letter.values())
         elif key == ord('S'):  # SHIFT+S - save and continue
-            # Close temp file before reading
-            temp_file.flush()
-            temp_file.close()
+            # Close both temp files before reading
+            temp_file_static.flush()
+            temp_file_static.close()
+            temp_file_dynamic.flush()
+            temp_file_dynamic.close()
             
             # Save data
-            save_path = save_final_data(temp_file.name, alphabet, label_map, dynamic_letters)
+            save_path = save_final_data(
+                temp_file_static.name,
+                temp_file_dynamic.name,
+                alphabet,
+                label_map,
+                dynamic_letters
+            )
             
             if save_path:
                 show_save_success(cap, save_path, 'Data Collection')
             
-            # Reopen temp file for continued collection
-            temp_file = open(temp_file.name, 'a', newline='')
-            csv_writer = csv.writer(temp_file)
+            # Reopen both temp files for continued collection
+            temp_file_static = open(temp_file_static.name, 'a', newline='')
+            csv_writer_static = csv.writer(temp_file_static)
+            temp_file_dynamic = open(temp_file_dynamic.name, 'a', newline='')
+            csv_writer_dynamic = csv.writer(temp_file_dynamic)
     
     # Cleanup
     cap.release()
     hands.close()
     cv2.destroyAllWindows()
     
-    # Close temp file
-    temp_file.close()
+    # Close both temp files
+    temp_file_static.close()
+    temp_file_dynamic.close()
     
-    return temp_file.name, alphabet, label_map
+    return temp_file_static.name, temp_file_dynamic.name, alphabet, label_map
 
 def run_collection(project_root):
     """Run the data collection workflow."""
