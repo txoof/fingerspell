@@ -11,7 +11,6 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from pathlib import Path
 
-
 def draw_text(image, text, position, font_size=20, color=(255, 255, 255), 
               font_path=None):
     """
@@ -370,78 +369,130 @@ def draw_progress_bar(image, current_count, target, letter, y_position=60):
     
     return image
 
-def draw_instructions(image, is_paused, position='topright'):
-    """
-    Draw on-screen instructions with properly sized box.
-    """
+def draw_text_window(
+    image,
+    text,
+    font_size=20,
+    font_path=None,
+    first_line_color=(0, 255, 255),   # cv2 BGR
+    color=(255, 255, 255),            # cv2 BGR
+    position='topright',              # str anchor OR (x, y)
+    margin=20,
+    padding=16,
+    bg_color=(0, 0, 0),
+    bg_alpha=0.85,
+    border_color=(100, 100, 100),
+    project_root='./'
+):
+
+    project_root = Path(project_root)
     h, w = image.shape[:2]
-    
-    # Prepare instructions
-    if is_paused:
-        instructions = [
-            "PAUSED",
-            "SPACE - Resume",
-            "Letter - Switch",
-            "SHIFT+D - Discard",
-            "SHIFT+S - Save",
-            "ESC - Quit & Save"
-        ]
-    else:
-        instructions = [
-            "COLLECTING",
-            "SPACE - Pause",
-            "SHIFT+D - Discard",
-            "ESC - Quit"
-        ]
-    
-    # Load font to measure text
-    font_size = 20
-    bundled_font = Path("../assets/fonts/DejaVuSans.ttf")
+
+    if not isinstance(text, list):
+        text = str(text).split('\n')
+
+    if font_path is None:
+        font_path = project_root / 'assets/fonts/DejaVuSans.ttf'
+
     try:
-        font = ImageFont.truetype(str(bundled_font), font_size)
-    except:
+        font = ImageFont.truetype(str(font_path), font_size)
+    except Exception:
         font = ImageFont.load_default()
-    
-    # Measure EACH line to get maximum width needed
-    pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-    draw_obj = ImageDraw.Draw(pil_image)
-    
-    max_width = 0
-    for text_line in instructions:
-        bbox = draw_obj.textbbox((0, 0), text_line, font=font)
-        text_width = bbox[2] - bbox[0]
-        max_width = max(max_width, text_width)
-    
-    # Calculate box dimensions with proper padding
-    padding = 20
-    box_width = max_width + padding * 3  # Extra padding for safety
-    line_height = 30
-    box_height = len(instructions) * line_height + padding * 2
-    
-    # Position
-    if position == 'topright':
-        x = w - box_width - 20
-        y = 20
+
+    # Convert BGR -> RGB for PIL
+    pil_img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(pil_img)
+
+    line_sizes = []
+    max_w = 0
+    total_h = 0
+
+    for line in text:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        tw = bbox[2] - bbox[0]
+        th = bbox[3] - bbox[1]
+        line_sizes.append((tw, th))
+        max_w = max(max_w, tw)
+        total_h += th
+
+    line_spacing = max(int(font_size * 0.25), 4)
+    total_h += line_spacing * (len(text) - 1)
+
+    box_w = max_w + padding * 2
+    box_h = total_h + padding * 2
+
+    # -------------------------------
+    # Position resolution
+    # -------------------------------
+    if isinstance(position, (tuple, list)) and len(position) == 2:
+        x, y = int(position[0]), int(position[1])
+
+    elif isinstance(position, str):
+        pos = position.lower()
+
+        if pos == 'topleft':
+            x = margin
+            y = margin
+
+        elif pos == 'topright':
+            x = w - box_w - margin
+            y = margin
+
+        elif pos == 'bottomleft':
+            x = margin
+            y = h - box_h - margin
+
+        elif pos == 'bottomright':
+            x = w - box_w - margin
+            y = h - box_h - margin
+
+        else:
+            raise ValueError(f'Unknown position: {position}')
+
     else:
-        x = 20
-        y = 20
-    
-    # Draw semi-transparent background
+        raise TypeError('position must be a string anchor or (x, y) tuple')
+
+    # Clamp to image bounds
+    x = max(0, min(x, w - box_w))
+    y = max(0, min(y, h - box_h))
+
+    # Draw background using cv2
     overlay = image.copy()
-    cv2.rectangle(overlay, (x, y), (x + box_width, y + box_height), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, 0.85, image, 0.15, 0, image)
-    
-    # Draw border
-    cv2.rectangle(image, (x, y), (x + box_width, y + box_height), (100, 100, 100), 1)
-    
-    # Draw each line of text
-    y_text = y + padding
-    for i, text_line in enumerate(instructions):
-        color = (0, 255, 255) if i == 0 else (255, 255, 255)
-        image = draw_text(image, text_line, (x + padding, y_text + i * line_height),
-                         font_size=font_size, color=color)
-    
-    return image
+    cv2.rectangle(
+        overlay,
+        (x, y),
+        (x + box_w, y + box_h),
+        bg_color,
+        -1
+    )
+    cv2.addWeighted(overlay, bg_alpha, image, 1 - bg_alpha, 0, image)
+
+    cv2.rectangle(
+        image,
+        (x, y),
+        (x + box_w, y + box_h),
+        border_color,
+        1
+    )
+
+    # Draw text using PIL
+    pil_img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+    draw = ImageDraw.Draw(pil_img)
+
+    cur_y = y + padding
+    for i, line in enumerate(text):
+        bgr = first_line_color if i == 0 else color
+        rgb = (bgr[2], bgr[1], bgr[0])
+
+        draw.text(
+            (x + padding, cur_y),
+            line,
+            font=font,
+            fill=rgb
+        )
+        cur_y += line_sizes[i][1] + line_spacing
+
+    return cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
 
 
 def draw_landmarks(image, landmark_point):
