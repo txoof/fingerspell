@@ -382,14 +382,13 @@ def draw_text_window(
     bg_color=(0, 0, 0),
     bg_alpha=0.85,
     border_color=(100, 100, 100),
-    project_root='./'
+    project_root='./',
+    wrap=True,
+    fill_width=False
 ):
 
     project_root = Path(project_root)
     h, w = image.shape[:2]
-
-    if not isinstance(text, list):
-        text = str(text).split('\n')
 
     if font_path is None:
         font_path = project_root / 'assets/fonts/DejaVuSans.ttf'
@@ -399,31 +398,107 @@ def draw_text_window(
     except Exception:
         font = ImageFont.load_default()
 
-    # Convert BGR -> RGB for PIL
+    def _bgr_to_rgb(bgr):
+        return (bgr[2], bgr[1], bgr[0])
+
+    def _measure_line(draw, line):
+        bbox = draw.textbbox((0, 0), line, font=font)
+        return (bbox[2] - bbox[0], bbox[3] - bbox[1])
+
+    def _wrap_text(draw, s, max_width):
+        words = str(s).split()
+        if not words:
+            return ['']
+
+        lines = []
+        current = ''
+
+        for word in words:
+            test = f'{current}{word} '
+            tw, _ = _measure_line(draw, test)
+            if tw <= max_width:
+                current = test
+            else:
+                if current:
+                    lines.append(current.strip())
+                    current = f'{word} '
+                else:
+                    # single word longer than max_width, hard break
+                    lines.append(word)
+                    current = ''
+        if current:
+            lines.append(current.strip())
+
+        return lines
+
+    # Convert BGR -> RGB for PIL measurement
     pil_img = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
     draw = ImageDraw.Draw(pil_img)
 
+    # Normalize incoming text into lines
+    if isinstance(text, list):
+        raw_lines = [str(x) for x in text]
+    else:
+        raw_lines = str(text).split('\n')
+
+    # Wrapping requires a target width, so do it after we know the box width.
+    # If fill_width, we wrap to the full available width inside margins and padding.
+    if fill_width:
+        max_text_width = max(1, (w - 2 * margin) - 2 * padding)
+        lines = []
+        if wrap:
+            for raw in raw_lines:
+                lines.extend(_wrap_text(draw, raw, max_text_width))
+        else:
+            lines = raw_lines
+
+        box_w = (w - 2 * margin)
+    else:
+        # measure unwrapped lines, then optionally wrap to that width later if needed
+        lines = raw_lines
+
+        max_w = 0
+        total_h = 0
+        line_sizes = []
+
+        for line in lines:
+            tw, th = _measure_line(draw, line)
+            line_sizes.append((tw, th))
+            max_w = max(max_w, tw)
+            total_h += th
+
+        line_spacing = max(int(font_size * 0.25), 4)
+        total_h += line_spacing * (len(lines) - 1)
+
+        box_w = max_w + padding * 2
+
+        if wrap:
+            max_text_width = max(1, box_w - 2 * padding)
+            wrapped = []
+            for raw in raw_lines:
+                wrapped.extend(_wrap_text(draw, raw, max_text_width))
+            lines = wrapped
+
+    # Re measure final lines now that wrapping may have changed them
     line_sizes = []
     max_w = 0
     total_h = 0
 
-    for line in text:
-        bbox = draw.textbbox((0, 0), line, font=font)
-        tw = bbox[2] - bbox[0]
-        th = bbox[3] - bbox[1]
+    for line in lines:
+        tw, th = _measure_line(draw, line)
         line_sizes.append((tw, th))
         max_w = max(max_w, tw)
         total_h += th
 
     line_spacing = max(int(font_size * 0.25), 4)
-    total_h += line_spacing * (len(text) - 1)
+    total_h += line_spacing * (len(lines) - 1)
 
-    box_w = max_w + padding * 2
+    if not fill_width:
+        box_w = max_w + padding * 2
+
     box_h = total_h + padding * 2
 
-    # -------------------------------
     # Position resolution
-    # -------------------------------
     if isinstance(position, (tuple, list)) and len(position) == 2:
         x, y = int(position[0]), int(position[1])
 
@@ -433,22 +508,17 @@ def draw_text_window(
         if pos == 'topleft':
             x = margin
             y = margin
-
         elif pos == 'topright':
             x = w - box_w - margin
             y = margin
-
         elif pos == 'bottomleft':
             x = margin
             y = h - box_h - margin
-
         elif pos == 'bottomright':
             x = w - box_w - margin
             y = h - box_h - margin
-
         else:
             raise ValueError(f'Unknown position: {position}')
-
     else:
         raise TypeError('position must be a string anchor or (x, y) tuple')
 
@@ -480,9 +550,9 @@ def draw_text_window(
     draw = ImageDraw.Draw(pil_img)
 
     cur_y = y + padding
-    for i, line in enumerate(text):
+    for i, line in enumerate(lines):
         bgr = first_line_color if i == 0 else color
-        rgb = (bgr[2], bgr[1], bgr[0])
+        rgb = _bgr_to_rgb(bgr)
 
         draw.text(
             (x + padding, cur_y),
