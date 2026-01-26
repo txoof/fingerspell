@@ -15,6 +15,7 @@ from sklearn.metrics import classification_report, accuracy_score
 import joblib
 import csv
 import shutil
+import cv2
 
 
 def scan_path_for_training_data(working_path='~/Desktop',
@@ -307,3 +308,188 @@ def save_models(static_result, dynamic_result, static_labels_path, dynamic_label
         
         if dynamic_labels_path:
             shutil.copy(dynamic_labels_path, output_dir / 'keypoint_classifier_label_dynamic.csv')
+
+
+def show_training_message(model_type):
+    """
+    Show training message.
+    
+    Returns window_name for later cleanup.
+    
+    Args:
+        model_type: String like "Static" or "Dynamic"
+        
+    Returns:
+        str: Window name
+    """
+    window_name = "Training"
+    
+    # Create blank screen
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    screen[:] = (40, 40, 40)
+    
+    message = f"Training {model_type} Model..."
+    
+    # Center text
+    from src.fingerspell.ui.common import draw_text
+    screen = draw_text(screen, message, (640 - 200, 360),
+                      font_size=32, color=(255, 255, 255))
+    
+    cv2.imshow(window_name, screen)
+    cv2.waitKey(1)  # Force display update
+    
+    return window_name
+
+
+def show_training_results(static_result, dynamic_result, output_dir):
+    """
+    Show training results with accuracy and warnings.
+    
+    Displays success message and warnings for low-accuracy letters.
+    Waits for keypress to continue.
+    
+    Args:
+        static_result: Result dict from train_static_model() or None
+        dynamic_result: Result dict from train_dynamic_model() or None
+        output_dir: Path where models were saved
+    """
+    window_name = "Training Complete"
+    
+    # Build message
+    lines = ["Training Complete!"]
+    lines.append("")
+    
+    if static_result:
+        lines.append(f"Static Model: {static_result['accuracy']:.1%} accuracy")
+        if static_result['low_accuracy_letters']:
+            lines.append("  WARNING: Low accuracy letters (<80%):")
+            for letter, acc in static_result['low_accuracy_letters']:
+                lines.append(f"    {letter}: {acc:.1%}")
+            lines.append("  Consider collecting more data for these letters")
+        lines.append("")
+    
+    if dynamic_result:
+        lines.append(f"Dynamic Model: {dynamic_result['accuracy']:.1%} accuracy")
+        if dynamic_result['low_accuracy_letters']:
+            lines.append("  WARNING: Low accuracy letters (<80%):")
+            for letter, acc in dynamic_result['low_accuracy_letters']:
+                lines.append(f"    {letter}: {acc:.1%}")
+            lines.append("  Consider collecting more data for these letters")
+        lines.append("")
+    
+    lines.append(f"Models saved to:")
+    lines.append(f"{output_dir}")
+    lines.append("")
+    lines.append("Press any key to continue")
+    
+    message = "\n".join(lines)
+    
+    # Show message
+    while True:
+        screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+        screen[:] = (40, 40, 40)
+        
+        from src.fingerspell.ui.common import draw_modal_overlay
+        screen = draw_modal_overlay(screen, message, position='center', width_percent=80)
+        
+        cv2.imshow(window_name, screen)
+        
+        key = cv2.waitKey(1)
+        if key != -1:  # Any key pressed
+            break
+    
+    cv2.destroyWindow(window_name)
+
+
+def run_training_workflow(project_root=None):
+    """
+    Run complete training workflow.
+    
+    1. Scan Desktop for training data
+    2. Show selection menu
+    3. Train models with visual feedback
+    4. Save models
+    5. Show results
+    
+    Args:
+        project_root: Project root path (unused, for consistency with other modes)
+    """
+    from src.fingerspell.ui.menu import PaginatedMenu
+    
+    # Step 1: Scan for training data
+    training_dirs = scan_path_for_training_data('~/Desktop')
+    
+    if not training_dirs:
+        # Show "no data found" message
+        screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+        screen[:] = (40, 40, 40)
+        
+        from src.fingerspell.ui.common import draw_modal_overlay
+        message = "No training data found on Desktop.\n\nCollect training data first.\n\nPress any key to continue"
+        screen = draw_modal_overlay(screen, message, position='center')
+        
+        cv2.imshow("Training", screen)
+        while cv2.waitKey(1) == -1:
+            pass
+        cv2.destroyAllWindows()
+        return
+    
+    # Step 2: Show selection menu
+    menu = PaginatedMenu(
+        title="Select Training Data",
+        items=training_dirs,
+        format_fn=format_training_dir,
+        items_per_page=10
+    )
+    
+    selected = menu.run()
+    
+    if not selected:
+        return  # User cancelled
+    
+    # Step 3: Train models
+    static_result = None
+    dynamic_result = None
+    
+    # Train static if available
+    if selected['has_static']:
+        static_data = selected['path'] / 'keypoint_data_static.csv'
+        static_labels = selected['path'] / 'keypoint_classifier_label_static.csv'
+        
+        # Show training message
+        window_name = show_training_message("Static")
+        
+        # Train model
+        static_result = train_static_model(static_data, static_labels)
+        
+        # Close message
+        cv2.destroyWindow(window_name)
+    
+    # Train dynamic if available
+    if selected['has_dynamic']:
+        dynamic_data = selected['path'] / 'keypoint_data_dynamic.csv'
+        dynamic_labels = selected['path'] / 'keypoint_classifier_label_dynamic.csv'
+        
+        # Show training message
+        window_name = show_training_message("Dynamic")
+        
+        # Train model
+        dynamic_result = train_dynamic_model(dynamic_data, dynamic_labels)
+        
+        # Close message
+        cv2.destroyWindow(window_name)
+    
+    # Step 4: Save models
+    desktop = Path.home() / 'Desktop'
+    output_dir = desktop / f'fingerspell_models_{datetime.now().strftime("%Y%m%d_%H%M")}'
+    
+    save_models(
+        static_result,
+        dynamic_result,
+        static_labels if selected['has_static'] else None,
+        dynamic_labels if selected['has_dynamic'] else None,
+        output_dir
+    )
+    
+    # Step 5: Show results
+    show_training_results(static_result, dynamic_result, output_dir)
