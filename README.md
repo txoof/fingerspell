@@ -5,6 +5,7 @@ Finger Spelling Practice in Python
 **Table of Contents**
 
 - [Project Description](#project-description)
+- [Setup](#setup)
 - [Development Approach](#development-approach)
 - [Sources Cited](#sources-cited)
 
@@ -18,6 +19,22 @@ Finger Spelling Practice in Python
 ## Project Description
 
 This project offers Nederlanse Gebaren Taal Vingeralfabet (NGT Finger Alphabet) training for beginners. The model signs are based on the examples provided by [Vera de Kok](https://nl.wikipedia.org/wiki/Bestand:NGT_handalfabet.webm).
+
+## Setup
+
+This assumes a basic comfort with Python, creating virtual environments and working on the command line. 
+
+**Requirements**
+
+- Web Camera
+- Python 3.10 environment
+
+### Environment Setup & Launch
+
+1. Create a virtual environment for this project: `python3.10 -m venv fingerspell_venv`
+2. Activate the virtual env: `source ./fingerspell_venv/bin/activate`
+3. Install required packages: `pip install -r requirements.txt`
+4. Launch the application: `./fingerspell.py`
 
 ## Development Approach
 
