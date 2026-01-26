@@ -452,5 +452,6 @@ def run_collection(project_root):
     state['cap'] = cap  # Pass camera to collection loop
     
     # Step 5: Run collection loop (will handle camera cleanup)
-    temp_file, alphabet, label_map = run_collection_loop(state)
+    temp_file_static, temp_file_dynamic, alphabet, label_map = run_collection_loop(state)
+
 
