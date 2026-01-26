@@ -17,7 +17,7 @@ Finger Spelling Practice in Python
 
 ## Project Description
 
-This project offers Nederlanse Gebaren Taal Vingeralfabet (NGT Finger Alphabet) training for beginners. The model signs are based on the examples provided by [Vera de Kok](https://nl.wikipedia.org/wiki/Bestand:NGT_handalfabet.webm).
+This project offers Nederlanse Gebaren Taal Vingeralfabet (NGT Finger Alphabet) training for beginners. The model signs are based on the examples provided by [Wapperkids YouTube Video](https://www.youtube.com/watch?v=GMi9qDSw2o8).
 
 ## Development Approach
 
@@ -144,10 +144,9 @@ Dynamic Letter Model (5 letters):
 
 ### Continued Improvements
 
-After the initial development phase, we continued to improve the product by doing the following...
+After the initial development phase, we continued to improve the product by doing the following:
 
 - 22 Jan: Error analysis leads to adding additional data. We gathered max confidence scores and identified signs that had poor performance. The goal is to get >=70 for all signs across three users.
-- 
 
 | Sign | Max AC | Max YM | Max AR | Average | Proposed Action                             |
 | ---- | ------ | ------ | ------ | ------- | ------------------------------------------- |
@@ -188,7 +187,21 @@ After the initial development phase, we continued to improve the product by doin
 
 ## Sources Cited
 
+### References
+
 | Source                                                                                                      | Description                                                               | Usage                                                                              | License                                                                                |
 | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | [ashgadala/american-sign-language-detection](https://github.com/ashgadala/american-sign-language-detection) | ASL fingerspelling recognition dataset                                    | Used data structure and training data for letters that overlap between ASL and NGT | [MIT](https://github.com/ashgadala/american-sign-language-detection/blob/main/LICENSE) |
+| [Wapperkids NLGebaren doe je zo ALFABET](https://www.youtube.com/watch?v=GMi9qDSw2o8)                       | Reference video demonstrating Dutch Sign Language fingerspelling alphabet | Used as reference material for correct NGT letter formation                        |                                                                                        |
 | [NGT Handalfabet by Vera de Kok](https://nl.wikipedia.org/wiki/Bestand:NGT_handalfabet.webm)                | Reference video demonstrating Dutch Sign Language fingerspelling alphabet | Used as reference material for correct NGT letter formation                        | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/)                        |
+
+### Fonts
+
+This project includes DejaVu Sans font for Unicode text rendering:
+
+**DejaVu Sans**
+- License: DejaVu Fonts License (based on Bitstream Vera Fonts and Public Domain)
+- Source: https://dejavu-fonts.github.io/
+- Files: `assets/fonts/DejaVuSans.ttf`, `DejaVuSans-Bold.ttf`
+
+The DejaVu fonts are free to use, modify, and distribute. See `[assets/fonts/DejaVu Fonts Licenses.txt](./assets/fonts/DejaVu Fonts License.txt)` for full license text.
