@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 import pandas as pd
 import cv2
+import json
 from PIL import Image, ImageDraw, ImageFont
 from src.fingerspell.ui.common import draw_modal_input, draw_modal_overlay, draw_text, draw_text_window
 
@@ -154,6 +155,18 @@ def save_final_data(cap, temp_filename_static, temp_filename_dynamic, alphabet, 
             writer = csv.writer(f)
             for letter in dynamic_letters_list:
                 writer.writerow([letter])
+    
+    # Save metadata
+    metadata = {
+        'alphabet': alphabet,
+        'dynamic_letters': sorted(list(dynamic_letters)),
+        'created': datetime.now().isoformat(),
+        'modified': datetime.now().isoformat()
+    }
+    
+    metadata_path = output_dir / 'dataset_metadata.json'
+    with open(metadata_path, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
     
     return str(output_dir)
 
@@ -462,3 +475,168 @@ def show_save_success(cap, save_path, window_name='Data Collection'):
 #         y_text += line_height
     
 #     return image
+
+
+def load_existing_dataset(dataset_dir):
+    """
+    Load alphabet and dynamic letters from existing dataset.
+    
+    Reads metadata.json if available, otherwise falls back to label files.
+    
+    Args:
+        dataset_dir: Path to dataset directory
+        
+    Returns:
+        dict: {
+            'alphabet': list of characters,
+            'dynamic_letters': set of dynamic characters,
+            'label_map': dict mapping characters to indices,
+            'static_data_path': Path to static CSV or None,
+            'dynamic_data_path': Path to dynamic CSV or None,
+            'static_samples': int count of existing static samples,
+            'dynamic_samples': int count of existing dynamic samples
+        }
+        Returns None if dataset invalid
+    """
+    dataset_dir = Path(dataset_dir)
+    metadata_path = dataset_dir / 'dataset_metadata.json'
+    
+    # Try loading from metadata file first
+    if metadata_path.exists():
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        alphabet = metadata['alphabet']
+        dynamic_letters = set(metadata['dynamic_letters'])
+    else:
+        # Fallback: load from label files (for backward compatibility)
+        static_labels_path = dataset_dir / 'keypoint_classifier_label_static.csv'
+        dynamic_labels_path = dataset_dir / 'keypoint_classifier_label_dynamic.csv'
+        
+        has_static = static_labels_path.exists()
+        has_dynamic = dynamic_labels_path.exists()
+        
+        if not has_static and not has_dynamic:
+            return None
+        
+        # Load letters from label files
+        static_letters = []
+        dynamic_letters_list = []
+        
+        if has_static:
+            with open(static_labels_path, 'r', encoding='utf-8-sig') as f:
+                static_letters = [row[0] for row in csv.reader(f)]
+        
+        if has_dynamic:
+            with open(dynamic_labels_path, 'r', encoding='utf-8-sig') as f:
+                dynamic_letters_list = [row[0] for row in csv.reader(f)]
+        
+        # Combine to get full alphabet
+        all_letters = set(static_letters + dynamic_letters_list)
+        alphabet = sorted(all_letters, key=lambda x: ord(x))
+        dynamic_letters = set(dynamic_letters_list)
+    
+    # Check for data files
+    static_data = dataset_dir / 'keypoint_data_static.csv'
+    dynamic_data = dataset_dir / 'keypoint_data_dynamic.csv'
+    
+    # Create label mapping (sorted by unicode)
+    label_map = {char: idx for idx, char in enumerate(alphabet)}
+    
+    # Count existing samples
+    static_samples = 0
+    dynamic_samples = 0
+    
+    if static_data.exists():
+        with open(static_data) as f:
+            static_samples = sum(1 for line in f)
+    
+    if dynamic_data.exists():
+        with open(dynamic_data) as f:
+            dynamic_samples = sum(1 for line in f)
+    
+    return {
+        'alphabet': alphabet,
+        'dynamic_letters': dynamic_letters,
+        'label_map': label_map,
+        'static_data_path': static_data if static_data.exists() else None,
+        'dynamic_data_path': dynamic_data if dynamic_data.exists() else None,
+        'static_samples': static_samples,
+        'dynamic_samples': dynamic_samples
+    }
+
+
+def load_existing_data_into_temp_files(temp_file_static, temp_file_dynamic, 
+                                       existing_static_path, existing_dynamic_path,
+                                       label_map):
+    """
+    Load existing dataset samples into temp files for editing.
+    
+    Reads existing CSV files and writes to temp files with sample_id column added.
+    Maps old label indices to new label_map.
+    
+    Args:
+        temp_file_static: Open temp file for static data
+        temp_file_dynamic: Open temp file for dynamic data
+        existing_static_path: Path to existing static CSV or None
+        existing_dynamic_path: Path to existing dynamic CSV or None
+        label_map: New label mapping for this session
+        
+    Returns:
+        dict: {letter: count} of loaded samples per letter
+    """
+    sample_id = 0
+    collected_per_letter = {}
+    
+    csv_writer_static = csv.writer(temp_file_static)
+    csv_writer_dynamic = csv.writer(temp_file_dynamic)
+    
+    # Load static data if exists
+    if existing_static_path and existing_static_path.exists():
+        # Load old labels
+        labels_path = existing_static_path.parent / 'keypoint_classifier_label_static.csv'
+        with open(labels_path, 'r', encoding='utf-8-sig') as f:
+            old_labels = [row[0] for row in csv.reader(f)]
+        
+        # Read and remap data
+        with open(existing_static_path, 'r') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                old_label_idx = int(row[0])
+                old_letter = old_labels[old_label_idx]
+                new_label_idx = label_map[old_letter]
+                
+                # Write with new label and sample_id
+                csv_writer_static.writerow([sample_id, new_label_idx] + row[1:])
+                sample_id += 1
+                
+                # Track count
+                collected_per_letter[old_letter] = collected_per_letter.get(old_letter, 0) + 1
+        
+        temp_file_static.flush()
+    
+    # Load dynamic data if exists
+    if existing_dynamic_path and existing_dynamic_path.exists():
+        # Load old labels
+        labels_path = existing_dynamic_path.parent / 'keypoint_classifier_label_dynamic.csv'
+        with open(labels_path, 'r', encoding='utf-8-sig') as f:
+            old_labels = [row[0] for row in csv.reader(f)]
+        
+        # Read and remap data
+        with open(existing_dynamic_path, 'r') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                old_label_idx = int(row[0])
+                old_letter = old_labels[old_label_idx]
+                new_label_idx = label_map[old_letter]
+                
+                # Write with new label and sample_id
+                csv_writer_dynamic.writerow([sample_id, new_label_idx] + row[1:])
+                sample_id += 1
+                
+                # Track count
+                collected_per_letter[old_letter] = collected_per_letter.get(old_letter, 0) + 1
+        
+        temp_file_dynamic.flush()
+    
+    return collected_per_letter

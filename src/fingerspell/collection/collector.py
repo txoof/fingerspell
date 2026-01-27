@@ -24,8 +24,11 @@ from src.fingerspell.collection.data_management import (
     discard_samples, 
     draw_letter_status,
     show_save_confirmation,
-    show_save_success
+    show_save_success,
+    load_existing_dataset,
+    load_existing_data_into_temp_files
 )
+from src.fingerspell.training.trainer import scan_path_for_training_data, format_training_dir
 from src.fingerspell.core.landmarks import calc_landmark_list, pre_process_landmark
 
 def draw_instructions(image, is_paused, position='topright', project_root='./'):
@@ -429,33 +432,154 @@ def run_collection(project_root):
     
     window_name = "Data Collection"
     
-    # Step 1: Get alphabet
-    alphabet = get_alphabet_configuration(cap, window_name)
-    if alphabet is None:
+    # Step 0: Ask if new or extend existing
+    from src.fingerspell.ui.menu import Menu, PaginatedMenu
+    
+    mode_menu = Menu(
+        title="Dataset Collection",
+        options=[
+            ('1', 'Create New Dataset'),
+            ('2', 'Extend/Edit Existing Dataset'),
+            ('', ''),
+            ('', 'ESC - Cancel')
+        ],
+        window_name=window_name
+    )
+    
+    mode = mode_menu.run()
+    
+    if mode == '1':
+        # NEW DATASET FLOW
+        # Step 1: Get alphabet
+        alphabet = get_alphabet_configuration(cap, window_name)
+        if alphabet is None:
+            cap.release()
+            cv2.destroyAllWindows()
+            return
+        
+        # Step 2: Get dynamic letters
+        dynamic_letters = get_dynamic_letters_configuration(alphabet, cap, window_name)
+        
+        # Step 3: Show summary and confirm
+        if not show_configuration_summary(alphabet, dynamic_letters, cap, window_name):
+            cap.release()
+            cv2.destroyAllWindows()
+            return
+        
+        # Step 4: Initialize collection with empty temp files
+        state = initialize_collection(alphabet, dynamic_letters)
+        if state is None:
+            cap.release()
+            cv2.destroyAllWindows()
+            return
+    
+    elif mode == '2':
+        # EXTEND EXISTING DATASET FLOW
+        # Step 1: Scan for existing datasets
+        datasets = scan_path_for_training_data('~/Desktop')
+        
+        if not datasets:
+            from src.fingerspell.ui.common import draw_modal_overlay
+            screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+            screen[:] = (40, 40, 40)
+            message = "No datasets found on Desktop.\n\nCreate a new dataset first.\n\nPress any key to continue"
+            screen = draw_modal_overlay(screen, message, position='center')
+            cv2.imshow(window_name, screen)
+            while cv2.waitKey(1) == -1:
+                pass
+            cap.release()
+            cv2.destroyAllWindows()
+            return
+        
+        # Step 2: Select dataset
+        dataset_menu = PaginatedMenu(
+            title="Select Dataset to Extend",
+            items=datasets,
+            format_fn=format_training_dir,
+            items_per_page=10
+        )
+        
+        selected = dataset_menu.run()
+        
+        if not selected:
+            cap.release()
+            cv2.destroyAllWindows()
+            return
+        
+        # Step 3: Load existing dataset
+        existing = load_existing_dataset(selected['path'])
+        if not existing:
+            cap.release()
+            cv2.destroyAllWindows()
+            return
+        
+        alphabet = existing['alphabet']
+        dynamic_letters = existing['dynamic_letters']
+        
+        # Step 4: Show summary and confirm
+        summary = f"Extending: {selected['name']}\n\n"
+        summary += f"Alphabet: {''.join(alphabet)} ({len(alphabet)} letters)\n\n"
+        summary += f"Dynamic: {', '.join(sorted(dynamic_letters)) if dynamic_letters else 'None'}\n\n"
+        summary += f"Existing samples:\n"
+        summary += f"  Static: {existing['static_samples']}\n"
+        summary += f"  Dynamic: {existing['dynamic_samples']}\n\n"
+        summary += "Press SPACE to start collecting\n"
+        summary += "Press ESC to cancel"
+        
+        from src.fingerspell.ui.common import draw_modal_overlay
+        while True:
+            ret, image = cap.read()
+            if not ret:
+                cap.release()
+                cv2.destroyAllWindows()
+                return
+            
+            image = cv2.flip(image, 1)
+            image = draw_modal_overlay(image, summary, position='center')
+            cv2.imshow(window_name, image)
+            
+            key = cv2.waitKey(1)
+            if key == 27:  # ESC - cancel
+                cap.release()
+                cv2.destroyAllWindows()
+                return
+            elif key == 32:  # SPACE - proceed
+                break
+        
+        # Step 5: Initialize collection and load existing data
+        state = initialize_collection(alphabet, dynamic_letters)
+        if state is None:
+            cap.release()
+            cv2.destroyAllWindows()
+            return
+        
+        # Load existing samples into temp files
+        loaded_counts = load_existing_data_into_temp_files(
+            state['temp_file_static'],
+            state['temp_file_dynamic'],
+            existing['static_data_path'],
+            existing['dynamic_data_path'],
+            existing['label_map']
+        )
+        
+        # Update tracking with existing counts
+        state['collected_per_letter'] = {letter: 0 for letter in alphabet}
+        for letter, count in loaded_counts.items():
+            state['collected_per_letter'][letter] = count
+        
+        state['sample_id'] = sum(loaded_counts.values())
+    
+    else:
+        # User cancelled
         cap.release()
         cv2.destroyAllWindows()
         return
     
-    # Step 2: Get dynamic letters
-    dynamic_letters = get_dynamic_letters_configuration(alphabet, cap, window_name)
-    
-    # Step 3: Show summary and confirm
-    if not show_configuration_summary(alphabet, dynamic_letters, cap, window_name):
-        cap.release()
-        cv2.destroyAllWindows()
-        return
-    
-    # Camera stays open - don't release it!
-    # Step 4: Initialize collection
-    state = initialize_collection(alphabet, dynamic_letters)
-    if state is None:
-        cap.release()
-        cv2.destroyAllWindows()
-        return
+    # Camera stays open - continue to collection
     state['project_root'] = project_root
-    state['cap'] = cap  # Pass camera to collection loop
+    state['cap'] = cap
     
-    # Step 5: Run collection loop (will handle camera cleanup)
+    # Step 6: Run collection loop (handles both new and extend modes)
     temp_file_static, temp_file_dynamic, alphabet, label_map = run_collection_loop(state)
 
 
