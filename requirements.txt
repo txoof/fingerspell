@@ -29,5 +29,5 @@ joblib
 # Testing
 pytest
 
-# Packaging
-pyinstaller
+# Font Rendering and Graphics
+pillow
