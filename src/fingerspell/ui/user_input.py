@@ -91,7 +91,7 @@ def show_validation_warnings(alphabet, cap=None, window_name='Validation Warning
     instructions = "Press any key to continue."
     full_text = f"{warning_text}\n\n{instructions}"
     
-    print(f"WARNING: {warning_text}")
+
     
     while True:
         ret, image = cap.read()
@@ -147,9 +147,6 @@ def get_text_input(prompt, validation_fn=None, default_value="", window_name="In
     current_input = ""
     error_msg = None
     
-    print(f"\n{prompt}")
-    if default_value:
-        print(f"(Default: {default_value})")
     
     while True:
         ret, image = cap.read()

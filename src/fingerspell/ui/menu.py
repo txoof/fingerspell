@@ -87,14 +87,6 @@ class Menu:
         # Create black screen
         screen = np.zeros((self.height, self.width, 3), dtype=np.uint8)
         
-        print(f"\n{self.title}")
-        print("=" * 60)
-        for key, description in self.options:
-            if key:
-                print(f"  {key} - {description}")
-            else:
-                print(f"  {description}")
-        print("=" * 60)
         
         while True:
             display = screen.copy()
@@ -262,32 +254,3 @@ class PaginatedMenu(Menu):
                     cv2.destroyAllWindows()
                     return page_items[selected_idx]
 
-
-# Smoke test
-if __name__ == '__main__':
-    print("Menu class smoke test")
-    print("=" * 60)
-    
-    # Test menu
-    menu = Menu(
-        title="NGT Fingerspelling System",
-        options=[
-            ('1', 'Collect Training Data'),
-            ('2', 'Train Models'),
-            ('3', 'Run Recognition'),
-            ('4', 'Alphabet Quiz'),
-            ('', ''),  # Blank line
-            ('', 'ESC - Quit')
-        ],
-        window_name="Test Menu"
-    )
-    
-    print("\nShowing menu (press a number key or ESC)...")
-    choice = menu.run()
-    
-    if choice:
-        print(f"\nYou selected: {choice}")
-    else:
-        print("\nMenu cancelled")
-    
-    print("\nSmoke test complete!")
