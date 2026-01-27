@@ -38,11 +38,13 @@ class ModelManager:
     def _load_models(self):
         """Load models from disk if paths provided."""
         if self.static_model_path and self.static_model_path.exists():
-            self.static_model = joblib.load(self.static_model_path)
+            # Convert to string for compatibility with joblib
+            self.static_model = joblib.load(str(self.static_model_path))
      
         
         if self.dynamic_model_path and self.dynamic_model_path.exists():
-            self.dynamic_model = joblib.load(self.dynamic_model_path)
+            # Convert to string for compatibility with joblib
+            self.dynamic_model = joblib.load(str(self.dynamic_model_path))
   
         
     def _load_labels(self):
@@ -50,11 +52,13 @@ class ModelManager:
         import csv
         
         if self.static_labels_path and self.static_labels_path.exists():
-            with open(self.static_labels_path, 'r', encoding='utf-8-sig') as f:
+            # Convert to string for file operations
+            with open(str(self.static_labels_path), 'r', encoding='utf-8-sig') as f:
                 self.static_labels = [row[0] for row in csv.reader(f)]
         
         if self.dynamic_labels_path and self.dynamic_labels_path.exists():
-            with open(self.dynamic_labels_path, 'r', encoding='utf-8-sig') as f:
+            # Convert to string for file operations
+            with open(str(self.dynamic_labels_path), 'r', encoding='utf-8-sig') as f:
                 self.dynamic_labels = [row[0] for row in csv.reader(f)]
     
     def predict_static(self, normalized_landmarks):
