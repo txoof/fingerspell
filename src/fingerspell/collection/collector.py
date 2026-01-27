@@ -338,13 +338,15 @@ def run_collection_loop(state):
                     temp_file_dynamic.flush()
                     temp_file_dynamic.close()
                     
-                    # Save data
+                    # Save data (prompts for name)
                     save_path = save_final_data(
+                        cap,
                         temp_file_static.name,
                         temp_file_dynamic.name,
                         alphabet,
                         label_map,
-                        dynamic_letters
+                        dynamic_letters,
+                        'Data Collection'
                     )
                     
                     if save_path:
@@ -386,13 +388,15 @@ def run_collection_loop(state):
             temp_file_dynamic.flush()
             temp_file_dynamic.close()
             
-            # Save data
+            # Save data (prompts for name)
             save_path = save_final_data(
+                cap,
                 temp_file_static.name,
                 temp_file_dynamic.name,
                 alphabet,
                 label_map,
-                dynamic_letters
+                dynamic_letters,
+                'Data Collection'
             )
             
             if save_path:

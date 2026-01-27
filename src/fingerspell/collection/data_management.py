@@ -13,20 +13,26 @@ from PIL import Image, ImageDraw, ImageFont
 from src.fingerspell.ui.common import draw_modal_input, draw_modal_overlay, draw_text, draw_text_window
 
 
-def save_final_data(temp_filename_static, temp_filename_dynamic, alphabet, label_map, dynamic_letters):
+def save_final_data(cap, temp_filename_static, temp_filename_dynamic, alphabet, label_map, dynamic_letters, window_name='Data Collection'):
     """
     Save final training data to Desktop from already-separated temp files.
     
+    Prompts user for dataset name, then saves with custom or default name.
+    
     Args:
+        cap: Existing cv2.VideoCapture object for name input
         temp_filename_static: Path to static temp CSV file
         temp_filename_dynamic: Path to dynamic temp CSV file
         alphabet: List of characters in the alphabet
         label_map: Dict mapping characters to original label indices
         dynamic_letters: Set of dynamic letter characters
+        window_name: OpenCV window name
     
     Returns:
         str: Path to output directory if save successful, None if no data to save
     """
+    from src.fingerspell.collection.naming import get_dataset_name
+    
     # Read both temp files
     static_rows = []
     dynamic_rows = []
@@ -57,9 +63,12 @@ def save_final_data(temp_filename_static, temp_filename_dynamic, alphabet, label
     if len(static_rows) == 0 and len(dynamic_rows) == 0:
         return None
     
-    # Create output directory
+    # Get dataset name from user
+    dataset_name = get_dataset_name(cap, window_name)
+    
+    # Create output directory with custom name
     desktop = Path.home() / "Desktop"
-    output_dir = desktop / f"fingerspell_data_{datetime.now().strftime('%Y%m%d_%H%M')}"
+    output_dir = desktop / dataset_name
     output_dir.mkdir(parents=True, exist_ok=True)
     
     # Process static data
@@ -260,6 +269,7 @@ def discard_samples(cap, temp_filename_static, temp_filename_dynamic, alphabet, 
             confirm_input += chr(key)
     
     # Actually discard from CSV
+    print(f"Discarding {discard_count} samples of '{target_letter}'...")
     
     # Determine which file to modify
     is_dynamic = target_letter in dynamic_letters
@@ -290,6 +300,7 @@ def discard_samples(cap, temp_filename_static, temp_filename_dynamic, alphabet, 
     # Update tracking
     collected_per_letter[target_letter] -= discard_count
     
+    print(f"Discarded {discard_count} samples. Remaining for '{target_letter}': {collected_per_letter[target_letter]}")
     
     return collected_per_letter
 
