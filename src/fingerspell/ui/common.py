@@ -53,7 +53,6 @@ def draw_text(image, text, position, font_size=20, color=(255, 255, 255),
         else:
             font = ImageFont.load_default()
     except Exception as e:
-        print(f"Font loading error: {e}, using default")
         font = ImageFont.load_default()
     
     # Convert BGR to RGB for PIL
@@ -697,68 +696,3 @@ def draw_landmarks(image, landmark_point):
     
     return image
 
-
-# Smoke test
-if __name__ == '__main__':
-    print("common.py smoke test")
-    print("=" * 50)
-    
-    # Create test frame
-    test_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-    test_frame[:] = (50, 100, 150)  # Some color so we can see overlay
-    
-    # Test draw_text
-    print("\nTesting draw_text...")
-    frame_text = test_frame.copy()
-    result_text = draw_text(frame_text, "Test ÆØÅ ☑☐", (100, 100), font_size=30)
-    print(f"  Unicode text: OK")
-    
-    # Test draw_modal_overlay
-    print("\nTesting draw_modal_overlay...")
-    
-    frame1 = test_frame.copy()
-    result1 = draw_modal_overlay(frame1, "Collection complete!", position='center')
-    print(f"  Center position: OK")
-    
-    long_text = "This is a very long message that should wrap across multiple lines automatically."
-    frame2 = test_frame.copy()
-    result2 = draw_modal_overlay(frame2, long_text, position='top', width_percent=60)
-    print(f"  Top position with wrapping: OK")
-    
-    # Test draw_modal_input
-    print("\nTesting draw_modal_input...")
-    
-    frame4 = test_frame.copy()
-    result4 = draw_modal_input(frame4, "Enter alphabet:", "ABCDEFGH")
-    print(f"  Basic input: OK")
-    
-    frame5 = test_frame.copy()
-    result5 = draw_modal_input(frame5, "Enter dynamic letters:", "123", 
-                               error_msg="Numbers not allowed")
-    print(f"  Input with error: OK")
-    
-    # Test draw_landmarks
-    print("\nTesting draw_landmarks...")
-    frame6 = test_frame.copy()
-    fake_landmarks = [[100 + i*20, 100 + i*10] for i in range(21)]
-    result6 = draw_landmarks(frame6, fake_landmarks)
-    print(f"  Hand skeleton: OK")
-    
-    # Test draw_progress_bar
-    print("\nTesting draw_progress_bar...")
-    frame7 = test_frame.copy()
-    result7 = draw_progress_bar(frame7, 1250, 2500, 'A', y_position=100)
-    print(f"  Progress bar: OK")
-    
-    # Test draw_instructions
-    print("\nTesting draw_instructions...")
-    frame8 = test_frame.copy()
-    result8 = draw_instructions(frame8, is_paused=True, position='topright')
-    print(f"  Instructions (paused): OK")
-    
-    frame9 = test_frame.copy()
-    result9 = draw_instructions(frame9, is_paused=False, position='topright')
-    print(f"  Instructions (running): OK")
-    
-    print("\nAll tests passed!")
-    print("\nVisual test available - check individual frames")

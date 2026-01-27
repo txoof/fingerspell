@@ -1,0 +1,1 @@
+ngt_static_classifier.pkl

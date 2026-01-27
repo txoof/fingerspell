@@ -1,79 +1,71 @@
 """
-UI display functions for fingerspelling recognition.
+Refactored UI display functions for fingerspelling recognition.
 
-All OpenCV drawing operations for predictions, debug overlays, and visual feedback.
+Optimized for speed with minimal rendering overhead.
+Uses draw_text_window for consistency.
 """
 
 import cv2
 
 
-def get_confidence_color(confidence, low_threshold, high_threshold):
+def get_confidence_color(confidence):
     """
     Get BGR color based on confidence level.
     
+    High (>80): Green
+    Medium (55-80): Yellow
+    Low (<55): Red
+    
     Args:
         confidence: Confidence percentage (0-100)
-        low_threshold: Threshold for red/yellow boundary
-        high_threshold: Threshold for yellow/green boundary
         
     Returns:
         Tuple of (B, G, R) color values
     """
-    if confidence >= high_threshold:
+    if confidence > 80:
         return (0, 255, 0)  # Green
-    elif confidence >= low_threshold:
+    elif confidence >= 55:
         return (0, 255, 255)  # Yellow
     else:
         return (0, 0, 255)  # Red
 
 
-def draw_semitransparent_box(frame, x, y, width, height, alpha=0.7):
-    """
-    Draw a semi-transparent black box.
-    
-    Args:
-        frame: Frame to draw on (modified in place)
-        x, y: Top-left corner coordinates
-        width, height: Box dimensions
-        alpha: Opacity (0=transparent, 1=opaque)
-    """
-    overlay = frame.copy()
-    cv2.rectangle(overlay, (x, y), (x + width, y + height), (0, 0, 0), -1)
-    cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-
-
-def draw_prediction_display(frame, letter, confidence, low_threshold, high_threshold, debug=False):
+def draw_prediction_display(frame, letter, confidence):
     """
     Draw main prediction display in upper-left corner.
     
-    Shows large letter with color-coded confidence.
+    Shows just the letter with color-coded confidence using draw_text_window.
+    Optimized for speed - minimal rendering.
     
     Args:
         frame: Frame to draw on (modified in place)
-        letter: Letter to display (or '?' if no hand)
+        letter: Letter to display
         confidence: Confidence percentage
-        low_threshold: Low confidence threshold
-        high_threshold: High confidence threshold
+        
+    Returns:
+        Modified frame
     """
-    # Semi-transparent background box
-    box_x, box_y = 20, 20
-    box_width, box_height = 200, 150
-    draw_semitransparent_box(frame, box_x, box_y, box_width, box_height, alpha=0.6)
+    from src.fingerspell.ui.common import draw_text_window
     
     # Get color based on confidence
-    color = get_confidence_color(confidence, low_threshold, high_threshold)
+    color = get_confidence_color(confidence)
     
-    # Draw large letter
-    cv2.putText(frame, letter,
-               (box_x + 50, box_y + 100),
-               cv2.FONT_HERSHEY_SIMPLEX, 3.0, color, 6, cv2.LINE_AA)
+    # Draw letter in top-left using draw_text_window
+    frame = draw_text_window(
+        image=frame,
+        text=letter,
+        font_size=80,
+        first_line_color=color,
+        color=color,
+        position='topleft',
+        margin=20,
+        padding=30,
+        bg_color=(0, 0, 0),
+        bg_alpha=0.7,
+        border_color=(100, 100, 100)
+    )
     
-    # Draw confidence percentage below
-    if debug:
-        conf_text = f"{confidence:.0f}%"
-        cv2.putText(frame, conf_text,
-                (box_x + 50, box_y + 140),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2, cv2.LINE_AA)
+    return frame
 
 
 def draw_no_hand_display(frame):
@@ -82,124 +74,119 @@ def draw_no_hand_display(frame):
     
     Args:
         frame: Frame to draw on (modified in place)
+        
+    Returns:
+        Modified frame
     """
-    draw_prediction_display(frame, "?", 0, 70, 85)
+    from src.fingerspell.ui.common import draw_text_window
+    
+    frame = draw_text_window(
+        image=frame,
+        text="?",
+        font_size=80,
+        first_line_color=(100, 100, 100),
+        color=(100, 100, 100),
+        position='topleft',
+        margin=20,
+        padding=30,
+        bg_color=(0, 0, 0),
+        bg_alpha=0.7,
+        border_color=(100, 100, 100)
+    )
+    
+    return frame
 
 
-def draw_motion_bar(frame, motion, threshold, max_display=0.3):
+def draw_debug_display(frame, result, supervisor, static_pred, dynamic_pred, model_manager):
     """
-    Draw motion indicator bar at bottom of frame.
+    Draw debug information in separate window using draw_text_window.
+    
+    Shows:
+    - Current prediction details
+    - Motion info
+    - Both model predictions
+    - Confidence thresholds
+    - Loaded models
     
     Args:
         frame: Frame to draw on (modified in place)
-        motion: Current motion value
-        threshold: Motion threshold (drawn as red line)
-        max_display: Maximum motion value for bar scaling
-    """
-    h = frame.shape[0]
-    
-    bar_x = 20
-    bar_y = h - 60
-    bar_width = 300
-    bar_height = 30
-    
-    # Background
-    cv2.rectangle(frame, (bar_x, bar_y),
-                 (bar_x + bar_width, bar_y + bar_height),
-                 (80, 80, 80), -1)
-    
-    # Fill based on motion
-    fill_ratio = min(1.0, motion / max_display)
-    fill_width = int(bar_width * fill_ratio)
-    
-    # Color: green if above threshold, gray if below
-    if motion >= threshold:
-        fill_color = (0, 255, 0)
-    else:
-        fill_color = (100, 100, 100)
-    
-    if fill_width > 0:
-        cv2.rectangle(frame, (bar_x, bar_y),
-                     (bar_x + fill_width, bar_y + bar_height),
-                     fill_color, -1)
-    
-    # Threshold line (red)
-    threshold_x = bar_x + int(bar_width * (threshold / max_display))
-    cv2.line(frame, (threshold_x, bar_y),
-            (threshold_x, bar_y + bar_height),
-            (0, 0, 255), 2)
-    
-    # Border
-    cv2.rectangle(frame, (bar_x, bar_y),
-                 (bar_x + bar_width, bar_y + bar_height),
-                 (200, 200, 200), 2)
-    
-    # Label
-    cv2.putText(frame, "Motion", (bar_x, bar_y - 5),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1, cv2.LINE_AA)
-
-
-def draw_debug_overlay(frame, supervisor, static_pred, dynamic_pred):
-    """
-    Draw debug information overlay.
-    
-    Args:
-        frame: Frame to draw on (modified in place)
-        supervisor: Supervisor instance (for thresholds and motion)
+        result: PredictionResult from supervisor
+        supervisor: Supervisor instance
         static_pred: Tuple of (letter, confidence) from static model
-        dynamic_pred: Tuple of (letter, confidence) from dynamic model or (None, 0)
+        dynamic_pred: Tuple of (letter, confidence) from dynamic model
+        model_manager: ModelManager instance
+        
+    Returns:
+        Modified frame
     """
-    panel_x = 20
-    panel_y = 230
-    panel_width = 500
-    panel_height = 150
+    from src.fingerspell.ui.common import draw_text_window
     
-    # Semi-transparent background
-    draw_semitransparent_box(frame, panel_x, panel_y, panel_width, panel_height, alpha=0.7)
+    # Build debug text
+    lines = []
     
-    # Get motion from supervisor
-    motion = supervisor._calculate_wrist_motion()
-    
-    y_pos = panel_y + 25
-    
-    # Motion and threshold
-    cv2.putText(frame,
-               f"Motion: {motion:.3f} | Threshold: {supervisor.motion_threshold:.3f}",
-               (panel_x + 10, y_pos),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
-    y_pos += 30
-    
-    # Static prediction
-    static_letter, static_conf = static_pred
-    cv2.putText(frame,
-               f"Static:  {static_letter} ({static_conf:.0f}%)",
-               (panel_x + 10, y_pos),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1, cv2.LINE_AA)
-    y_pos += 30
-    
-    # Dynamic prediction
-    dynamic_letter, dynamic_conf = dynamic_pred
-    if dynamic_letter is not None:
-        cv2.putText(frame,
-                   f"Dynamic: {dynamic_letter} ({dynamic_conf:.0f}%)",
-                   (panel_x + 10, y_pos),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 100, 255), 1, cv2.LINE_AA)
+    # Current prediction
+    if result:
+        lines.append(f"PREDICTION: {result.letter} ({result.confidence:.0f}%)")
+        lines.append(f"Source: {result.source}")
+        lines.append(f"Motion: {result.motion:.3f} (threshold: {supervisor.motion_threshold:.3f})")
     else:
-        cv2.putText(frame,
-                   "Dynamic: waiting for buffer...",
-                   (panel_x + 10, y_pos),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (100, 100, 100), 1, cv2.LINE_AA)
-    y_pos += 30
+        lines.append("PREDICTION: None")
     
-    # Confidence thresholds
-    cv2.putText(frame,
-               f"Confidence: Low={supervisor.confidence_threshold_low:.0f} High={supervisor.confidence_threshold_high:.0f}",
-               (panel_x + 10, y_pos),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (150, 150, 150), 1, cv2.LINE_AA)
-    y_pos += 25
+    lines.append("")
     
-    # Keybinding hints
-    cv2.putText(frame,
-               "k/j: motion +/- 0.01 | K/J: +/- 0.05 | w/s: conf low +/- 5 | W/S: conf high +/- 5",
-               (panel_x + 10, y_pos),
-               cv2.FONT_HERSHEY_SIMPLEX, 0.45, (150, 150, 150), 1, cv2.LINE_AA)
+    # Model predictions
+    static_letter, static_conf = static_pred
+    if static_letter:
+        lines.append(f"Static: {static_letter} ({static_conf:.0f}%)")
+    else:
+        lines.append("Static: No model")
+    
+    dynamic_letter, dynamic_conf = dynamic_pred
+    if dynamic_letter:
+        lines.append(f"Dynamic: {dynamic_letter} ({dynamic_conf:.0f}%)")
+    else:
+        lines.append("Dynamic: Buffer not ready" if model_manager.has_dynamic_model() else "Dynamic: No model")
+    
+    lines.append("")
+    
+    # Thresholds
+    lines.append(f"Conf Low: {supervisor.confidence_threshold_low:.0f}")
+    lines.append(f"Conf High: {supervisor.confidence_threshold_high:.0f}")
+    
+    lines.append("")
+    
+    # Loaded models
+    lines.append("LOADED MODELS:")
+    if model_manager.has_static_model():
+        lines.append(f"Static: {model_manager.static_model_path.name}")
+    else:
+        lines.append("Static: None")
+    
+    if model_manager.has_dynamic_model():
+        lines.append(f"Dynamic: {model_manager.dynamic_model_path.name}")
+    else:
+        lines.append("Dynamic: None")
+    
+    lines.append("")
+    lines.append("CONTROLS:")
+    lines.append("k/j: motion +/- 0.01")
+    lines.append("K/J: motion +/- 0.05")
+    lines.append("w/s: conf low +/- 5")
+    lines.append("W/S: conf high +/- 5")
+    
+    # Draw in top-right corner
+    frame = draw_text_window(
+        image=frame,
+        text=lines,
+        font_size=18,
+        first_line_color=(0, 255, 255),
+        color=(255, 255, 255),
+        position='topright',
+        margin=20,
+        padding=15,
+        bg_color=(0, 0, 0),
+        bg_alpha=0.85,
+        border_color=(100, 100, 100)
+    )
+    
+    return frame
