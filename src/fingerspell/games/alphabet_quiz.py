@@ -6,8 +6,7 @@ from src.fingerspell.core.supervisor import Supervisor
 from src.fingerspell.ui.display import (
     draw_prediction_display,
     draw_no_hand_display,
-    draw_motion_bar,
-    draw_debug_overlay
+    draw_debug_display
 )
 
 
@@ -192,14 +191,13 @@ class AlphabetQuizWindow:
                 
                 # Draw debug overlay if enabled
                 if self.show_debug:
-                    draw_debug_overlay(
+                    draw_debug_display(
                         frame,
+                        result,
                         self.supervisor,
                         (static_letter, static_conf),
                         dynamic_pred
                     )
-                    # Draw motion bar
-                    draw_motion_bar(frame, result.motion, self.supervisor.motion_threshold)
 
         else:
             # No hand detected
