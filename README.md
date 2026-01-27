@@ -82,7 +82,7 @@ You will need to be able to type all the characters of your alphabet and underst
 
 ### Gathering Data
 
-You will need to provide examples of hand positions for each letter. Follow these steps to tea
+You will need to provide examples of hand positions for each letter. Follow these steps to teach the model a new alphabet.
 
 1. From within the application Choose `1. Collect Training Data`
 
