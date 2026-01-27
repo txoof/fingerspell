@@ -17,8 +17,12 @@ from pathlib import Path
 block_cipher = None
 
 # Define what data files to include
+# Use the symlinked names - PyInstaller will follow symlinks and bundle actual files
 added_files = [
-    ('models/*.pkl', 'models'),  # Include all .pkl files from models/ directory
+    ('models/static_model.pkl', 'models'),
+    ('models/dynamic_model.pkl', 'models'),
+    ('models/keypoint_classifier_label_static.csv', 'models'),
+    ('models/keypoint_classifier_label_dynamic.csv', 'models'),
 ]
 
 # Add MediaPipe model files
@@ -40,7 +44,7 @@ a = Analysis(
     ],
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    runtime_hooks=['rthook_opencv_scaling.py'],
     excludes=[
         # Only exclude TensorFlow since we don't use it for inference
         'tensorflow',
@@ -65,7 +69,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,  # Set to False for windowed app (no console)
+    console=False,  # GUI app - no console window
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
@@ -91,4 +95,8 @@ if sys.platform == 'darwin':
         name='Fingerspell.app',
         icon=None,
         bundle_identifier='com.fingerspell.ngt',
+        info_plist={
+            'NSHighResolutionCapable': 'True',
+            'NSCameraUsageDescription': 'This app needs camera access for hand sign recognition',
+        },
     )
