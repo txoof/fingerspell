@@ -38,22 +38,13 @@ class ModelManager:
     def _load_models(self):
         """Load models from disk if paths provided."""
         if self.static_model_path and self.static_model_path.exists():
-            print(f"Loading static model from {self.static_model_path}")
             self.static_model = joblib.load(self.static_model_path)
-        else:
-            print("No static model loaded")
+     
         
         if self.dynamic_model_path and self.dynamic_model_path.exists():
-            print(f"Loading dynamic model from {self.dynamic_model_path}")
             self.dynamic_model = joblib.load(self.dynamic_model_path)
-        else:
-            print("No dynamic model loaded")
+  
         
-        if self.static_model or self.dynamic_model:
-            print("Models loaded successfully")
-        else:
-            print("WARNING: No models loaded!")
-    
     def _load_labels(self):
         """Load label mappings from CSV files if provided."""
         import csv

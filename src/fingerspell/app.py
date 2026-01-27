@@ -70,7 +70,6 @@ def main(project_root):
         choice = menu.run()
         
         if choice is None:
-            print("\nGoodbye!")
             break
         
         elif choice == '1':
@@ -87,6 +86,3 @@ def main(project_root):
             selected = load_custom_models()
             if selected:
                 custom_models = selected
-                print(f"\nCustom models loaded successfully")
-            else:
-                print(f"\nNo models selected, using defaults")

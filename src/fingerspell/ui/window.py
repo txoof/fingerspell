@@ -209,15 +209,7 @@ class RecognitionWindow:
         self.setup_camera()
         self.setup_mediapipe()
         
-        print("\nNGT Fingerspelling Recognizer")
-        print("Press 'ESC' to quit")
-        print("Press 'Tab' to toggle debug overlay")
-        print("\nDebug mode controls:")
-        print("  k/j: Adjust motion threshold (+/- 0.01)")
-        print("  K/J: Adjust motion threshold (+/- 0.05)")
-        print("  w/s: Adjust low confidence threshold (+/- 5)")
-        print("  W/S: Adjust high confidence threshold (+/- 5)")
-        print()
+
         
         try:
             while self.cap.isOpened():
@@ -247,7 +239,6 @@ class RecognitionWindow:
         if self.hands:
             self.hands.close()
         cv2.destroyAllWindows()
-        print("\nShutdown complete")
 
 
 def run_app(static_model_path=None, dynamic_model_path=None,

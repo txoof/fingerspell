@@ -260,7 +260,6 @@ def discard_samples(cap, temp_filename_static, temp_filename_dynamic, alphabet, 
             confirm_input += chr(key)
     
     # Actually discard from CSV
-    print(f"Discarding {discard_count} samples of '{target_letter}'...")
     
     # Determine which file to modify
     is_dynamic = target_letter in dynamic_letters
@@ -291,7 +290,6 @@ def discard_samples(cap, temp_filename_static, temp_filename_dynamic, alphabet, 
     # Update tracking
     collected_per_letter[target_letter] -= discard_count
     
-    print(f"Discarded {discard_count} samples. Remaining for '{target_letter}': {collected_per_letter[target_letter]}")
     
     return collected_per_letter
 
