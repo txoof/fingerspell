@@ -275,6 +275,7 @@ if __name__ == '__main__':
             ('1', 'Collect Training Data'),
             ('2', 'Train Models'),
             ('3', 'Run Recognition'),
+            ('4', 'Alphabet Quiz'),
             ('', ''),  # Blank line
             ('', 'ESC - Quit')
         ],

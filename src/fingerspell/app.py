@@ -9,6 +9,7 @@ from src.fingerspell.ui.menu import Menu
 from src.fingerspell.ui.window import run_app
 from src.fingerspell.collection.collector import run_collection
 from src.fingerspell.training.trainer import run_training_workflow
+from src.fingerspell.games.alphabet_quiz import run_quiz
 
 
 
@@ -31,6 +32,15 @@ def run_recognition_mode(project_root):
     
     run_app(str(static_model), str(dynamic_model))
 
+def run_alphabet_quiz(project_root):
+    """Run real-time recognition."""
+    
+    # Get model paths
+    static_model = project_root / 'models' / 'ngt_static_classifier.pkl'
+    dynamic_model = project_root / 'models' / 'ngt_dynamic_classifier.pkl'
+    
+    run_quiz(str(static_model), str(dynamic_model))
+
 
 def main(project_root):
     """Main application entry point."""
@@ -44,6 +54,7 @@ def main(project_root):
                 ('1', 'Collect Training Data'),
                 ('2', 'Train Models'),
                 ('3', 'Run Recognition'),
+                ('4', 'Play Alphabet Quiz'),
                 ('', ''),
                 ('', 'ESC - Quit')
             ],
@@ -58,10 +69,12 @@ def main(project_root):
         
         elif choice == '1':
             run_collection_mode(project_root)
-            
         
         elif choice == '2':
             run_training_mode(project_root)
         
         elif choice == '3':
             run_recognition_mode(project_root)
+
+        elif choice == '4':
+            run_alphabet_quiz(project_root)
