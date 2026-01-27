@@ -1,9 +1,3 @@
-"""
-Main application window and event loop.
-
-Coordinates camera capture, hand detection, supervisor processing, and display.
-"""
-
 import cv2
 import mediapipe as mp
 from src.fingerspell.core.landmarks import calc_landmark_list, pre_process_landmark
@@ -14,30 +8,21 @@ from src.fingerspell.ui.display import (
     draw_no_hand_display,
     draw_debug_display
 )
-from src.fingerspell.ui.common import draw_landmarks
 
 
 class AlphabetQuizWindow:
-    """Main application window for alphabet quiz."""
+    """Main application window for fingerspelling alphabet quiz."""
     
-    def __init__(self, static_model_path=None, dynamic_model_path=None,
-                 static_labels_path=None, dynamic_labels_path=None):
+    def __init__(self, static_model_path, dynamic_model_path):
         """
-        Initialize quiz.
+        Initialize window.
         
         Args:
-            static_model_path: Path to static classifier (optional)
-            dynamic_model_path: Path to dynamic classifier (optional)
-            static_labels_path: Path to static labels CSV (optional)
-            dynamic_labels_path: Path to dynamic labels CSV (optional)
+            static_model_path: Path to static classifier
+            dynamic_model_path: Path to dynamic classifier
         """
         # Initialize models and supervisor
-        self.model_manager = ModelManager(
-            static_model_path,
-            dynamic_model_path,
-            static_labels_path,
-            dynamic_labels_path
-        )
+        self.model_manager = ModelManager(static_model_path, dynamic_model_path)
         self.supervisor = Supervisor(self.model_manager)
         
         # MediaPipe setup
@@ -159,55 +144,65 @@ class AlphabetQuizWindow:
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.hands.process(rgb_frame)
         
-        # Initialize result and predictions for debug
-        result = None
-        static_pred = (None, 0.0)
-        dynamic_pred = (None, 0.0)
-        
         if results.multi_hand_landmarks:
             hand_landmarks = results.multi_hand_landmarks[0]
+            
+            # Draw hand skeleton
+            self.mp_drawing.draw_landmarks(
+                frame, hand_landmarks, self.mp_hands.HAND_CONNECTIONS
+            )
             
             # Extract and normalize landmarks
             landmark_list = calc_landmark_list(frame, hand_landmarks)
             normalized_landmarks = pre_process_landmark(landmark_list)
             
-            # Draw hand skeleton using our function
-            frame = draw_landmarks(frame, landmark_list)
-            
             # Get wrist position from MediaPipe (normalized coords)
             wrist_landmark = hand_landmarks.landmark[0]
             wrist_pos = [wrist_landmark.x, wrist_landmark.y, wrist_landmark.z]
             
-            # Get predictions (for both display and debug)
-            static_pred = self.model_manager.predict_static(normalized_landmarks)
+            # Get predictions for debug display
+            static_letter, static_conf = self.model_manager.predict_static(normalized_landmarks)
+            print(f"Log: {static_letter, static_conf}")
             
-            # Get dynamic prediction if buffer ready
+            # Check if dynamic buffer is ready
             if len(self.supervisor.landmark_buffer) >= self.supervisor.rolling_window_size:
                 current = self.supervisor.landmark_buffer[-1] if self.supervisor.landmark_buffer else normalized_landmarks
-                old = self.supervisor.landmark_buffer[0]
-                dynamic_pred = self.model_manager.predict_dynamic(current, old)
+                old = self.supervisor.landmark_buffer[0] if len(self.supervisor.landmark_buffer) >= self.supervisor.rolling_window_size else normalized_landmarks
+                dynamic_letter, dynamic_conf = self.model_manager.predict_dynamic(current, old)
+                dynamic_pred = (dynamic_letter, dynamic_conf)
+            else:
+                dynamic_pred = (None, 0.0)
+            print(f"Log: {dynamic_pred}")
             
             # Process through supervisor
             result = self.supervisor.process_frame(normalized_landmarks, wrist_pos)
             
             if result:
                 # Draw main prediction
-                frame = draw_prediction_display(frame, result.letter, result.confidence)
+                draw_prediction_display(
+                    frame,
+                    result.letter,
+                    result.confidence,
+                    self.supervisor.confidence_threshold_low,
+                    self.supervisor.confidence_threshold_high,
+                    debug=self.show_debug
+                )
+                
+                
+                # Draw debug overlay if enabled
+                if self.show_debug:
+                    draw_debug_display(
+                        frame,
+                        result,
+                        self.supervisor,
+                        (static_letter, static_conf),
+                        dynamic_pred
+                    )
+
         else:
             # No hand detected
             self.supervisor.clear_buffers()
-            frame = draw_no_hand_display(frame)
-        
-        # Draw debug overlay if enabled (always show when debug mode active)
-        if self.show_debug:
-            frame = draw_debug_display(
-                frame,
-                result,
-                self.supervisor,
-                static_pred,
-                dynamic_pred,
-                self.model_manager
-            )
+            draw_no_hand_display(frame)
         
         return frame
     
@@ -216,7 +211,15 @@ class AlphabetQuizWindow:
         self.setup_camera()
         self.setup_mediapipe()
         
-
+        print("\nNGT Fingerspelling Recognizer")
+        print("Press 'ESC' to quit")
+        print("Press 'Tab' to toggle debug overlay")
+        print("\nDebug mode controls:")
+        print("  k/j: Adjust motion threshold (+/- 0.01)")
+        print("  K/J: Adjust motion threshold (+/- 0.05)")
+        print("  w/s: Adjust low confidence threshold (+/- 5)")
+        print("  W/S: Adjust high confidence threshold (+/- 5)")
+        print()
         
         try:
             for l in self.alphabet:
@@ -248,23 +251,17 @@ class AlphabetQuizWindow:
         if self.hands:
             self.hands.close()
         cv2.destroyAllWindows()
+        print("\nShutdown complete")
 
 
-def run_quiz(static_model_path=None, dynamic_model_path=None,
-            static_labels_path=None, dynamic_labels_path=None):
+def run_quiz(static_model_path='../models/ngt_static_classifier.pkl',
+            dynamic_model_path='../models/ngt_dynamic_classifier.pkl'):
     """
-    Run the alphabet quiz.
+    Run the fingerspelling alphabet quiz application.
     
     Args:
-        static_model_path: Path to static classifier (optional)
-        dynamic_model_path: Path to dynamic classifier (optional)
-        static_labels_path: Path to static labels CSV (optional)
-        dynamic_labels_path: Path to dynamic labels CSV (optional)
+        static_model_path: Path to static classifier
+        dynamic_model_path: Path to dynamic classifier
     """
-    window = AlphabetQuizWindow(
-        static_model_path,
-        dynamic_model_path,
-        static_labels_path,
-        dynamic_labels_path
-    )
+    window = AlphabetQuizWindow(static_model_path, dynamic_model_path)
     window.run()
