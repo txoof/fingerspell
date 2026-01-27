@@ -16,6 +16,10 @@ fi
 
 # Clean previous builds
 echo "Cleaning previous builds..."
+if [ -d "dist/Fingerspell.app" ]; then
+    # Force remove the app bundle first
+    rm -rf dist/Fingerspell.app
+fi
 rm -rf build/
 rm -rf dist/
 echo "✓ Clean complete"
