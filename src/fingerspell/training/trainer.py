@@ -341,23 +341,48 @@ def show_training_message(model_type):
     return window_name
 
 
-def show_training_results(static_result, dynamic_result, output_dir):
+def show_training_results(static_result, dynamic_result, output_dir, dataset_metadata_path=None):
     """
     Show training results with accuracy and warnings.
     
     Displays success message and warnings for low-accuracy letters.
+    Also warns if metadata indicates missing letters.
     Waits for keypress to continue.
     
     Args:
         static_result: Result dict from train_static_model() or None
         dynamic_result: Result dict from train_dynamic_model() or None
         output_dir: Path where models were saved
+        dataset_metadata_path: Path to dataset_metadata.json or None
     """
     window_name = "Training Complete"
     
     # Build message
     lines = ["Training Complete!"]
     lines.append("")
+    
+    # Check for missing letters if metadata available
+    if dataset_metadata_path and Path(dataset_metadata_path).exists():
+        import json
+        with open(dataset_metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        configured_alphabet = set(metadata['alphabet'])
+        configured_dynamic = set(metadata['dynamic_letters'])
+        
+        # Get actually trained letters
+        trained_static = set(static_result['per_class_accuracy'].keys()) if static_result else set()
+        trained_dynamic = set(dynamic_result['per_class_accuracy'].keys()) if dynamic_result else set()
+        trained_letters = trained_static | trained_dynamic
+        
+        # Find missing letters
+        missing_letters = configured_alphabet - trained_letters
+        
+        if missing_letters:
+            lines.append(f"WARNING: {len(missing_letters)} letters configured but not trained:")
+            lines.append(f"  Missing: {', '.join(sorted(missing_letters))}")
+            lines.append("  Collect samples for these letters to complete the alphabet")
+            lines.append("")
     
     if static_result:
         lines.append(f"Static Model: {static_result['accuracy']:.1%} accuracy")
@@ -491,5 +516,11 @@ def run_training_workflow(project_root=None):
         output_dir
     )
     
-    # Step 5: Show results
-    show_training_results(static_result, dynamic_result, output_dir)
+    # Step 5: Show results (pass metadata path for missing letter check)
+    metadata_path = selected['path'] / 'dataset_metadata.json'
+    show_training_results(
+        static_result, 
+        dynamic_result, 
+        output_dir,
+        metadata_path if metadata_path.exists() else None
+    )

@@ -58,7 +58,7 @@ class Supervisor:
             wrist_position: List of [x, y, z] in normalized MediaPipe coords
             
         Returns:
-            PredictionResult or None if buffers not ready
+            PredictionResult or None if no models available or buffers not ready
         """
         # Add to buffers
         self.landmark_buffer.append(normalized_landmarks)
@@ -67,19 +67,54 @@ class Supervisor:
         # Calculate wrist motion
         motion = self._calculate_wrist_motion()
         
-        # Get predictions
-        static_letter, static_conf = self.model_manager.predict_static(normalized_landmarks)
+        # Check what models are available
+        has_static = self.model_manager.has_static_model()
+        has_dynamic = self.model_manager.has_dynamic_model()
         
-        # Decide routing
+        if not has_static and not has_dynamic:
+            return None  # No models loaded
+        
+        # Get predictions from available models
+        static_letter, static_conf = None, 0.0
+        dynamic_letter, dynamic_conf = None, 0.0
+        
+        if has_static:
+            static_letter, static_conf = self.model_manager.predict_static(normalized_landmarks)
+        
+        # Decide routing based on available models
         is_dynamic_motion = motion > self.motion_threshold
+        buffer_ready = len(self.landmark_buffer) >= self.rolling_window_size
         
-        # Try dynamic if motion detected and buffer is full
-        if is_dynamic_motion and len(self.landmark_buffer) >= self.rolling_window_size:
+        # Case 1: Only static model available
+        if has_static and not has_dynamic:
+            return PredictionResult(
+                letter=static_letter,
+                confidence=static_conf,
+                source='static',
+                motion=motion
+            )
+        
+        # Case 2: Only dynamic model available
+        if has_dynamic and not has_static:
+            if buffer_ready:
+                current = self.landmark_buffer[-1]
+                old = self.landmark_buffer[0]
+                dynamic_letter, dynamic_conf = self.model_manager.predict_dynamic(current, old)
+                return PredictionResult(
+                    letter=dynamic_letter,
+                    confidence=dynamic_conf,
+                    source='dynamic',
+                    motion=motion
+                )
+            else:
+                return None  # Buffer not ready yet
+        
+        # Case 3: Both models available - use motion to decide
+        if is_dynamic_motion and buffer_ready:
             current = self.landmark_buffer[-1]
             old = self.landmark_buffer[0]
             dynamic_letter, dynamic_conf = self.model_manager.predict_dynamic(current, old)
             
-            # Use dynamic prediction
             return PredictionResult(
                 letter=dynamic_letter,
                 confidence=dynamic_conf,
@@ -87,7 +122,6 @@ class Supervisor:
                 motion=motion
             )
         else:
-            # Use static prediction
             return PredictionResult(
                 letter=static_letter,
                 confidence=static_conf,

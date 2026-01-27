@@ -6,7 +6,9 @@ Finger Spelling Practice in Python
 
 - [Project Description](#project-description)
 - [Setup](#setup)
+- [Training and Extending Models](#training-and-extending-models)
 - [Development Approach](#development-approach)
+- [Next Steps](#next-steps)
 - [Sources Cited](#sources-cited)
 
 
@@ -18,7 +20,15 @@ Finger Spelling Practice in Python
 
 ## Project Description
 
-This project offers Nederlanse Gebaren Taal Vingeralfabet (NGT Finger Alphabet) training for beginners. The model signs are based on the examples provided by [Wapperkids YouTube Video](https://www.youtube.com/watch?v=GMi9qDSw2o8).
+This project offers Nederlanse Gebaren Taal Vingeralfabet (NGT Finger Alphabet) training for beginners. The model signs are based on the examples provided by [Wapperkids YouTube Video](https://www.youtube.com/watch?v=GMi9qDSw2o8). It can also be trained to work with **your** local language!
+
+The AI models used in this project benefit from learning from additional examples. Adding more examples of hand positions can help the models become more accurate. It is also possible to train an entirely new model for regional variations or entirely new alphabets.
+
+It is possible to do the following:
+
+- Add additional samples to an existing data set to improve accuracy
+- Create brand new AI models for new static and dynamic signs for almost any single-handed finger-spelling language
+- Build custom models for extended alphabets
 
 ## Setup
 
@@ -35,6 +45,82 @@ This assumes a basic comfort with Python, creating virtual environments and work
 2. Activate the virtual env: `source ./fingerspell_venv/bin/activate`
 3. Install required packages: `pip install -r requirements.txt`
 4. Launch the application: `./fingerspell.py`
+
+## Training and Extending Models
+
+The default models included in this project were trained by the authors. The authors are novice finger spellers that have learned NGT, the Nederlanse Gebaren Taal Vinger Alfabet (Dutch Sign Language Alphabet) from watching example videos. The quality of these signs may not be of a high enough quality for educational purposes, but do serve as a proof-of-concept model and project.
+
+We have provided a structure that allows end users to train additional models, or improve existing models created with this project.
+
+### Creating a New Alphabet Model
+
+You will need to be able to type all the characters of your alphabet and understand the difference between a dynamic and static sign. 
+
+**Dynamic Signs**: A gesture involving movement, speed, and changing hand shapes over time to represent a character, rather than a single, stationary pose.
+
+**Static Signs**: A single stationary pose involving no hand movement or change in shape over time to represent a character.
+
+#### Training Tips
+
+**Avoid big movements.** Keep your hand steady within the frame. The model learns finger, wrist and palm positions. If you move around a quickly, it learns less accurately.
+
+**Use good lighting.** If you don't see a steady "skeleton" drawn over your hand while training, the model isn't learning. If the skeleton jumps around wildly even though your hand is still, the model is learning "bad" positions. Try:
+
+- improving the lighting
+- moving back from the camera a little
+- holding your hand more still
+
+**Use one hand for all the signs you teach the model** If you typically finger spell with your right hand, use your right hand for all the examples you provide. The models will automatically learn to understand symbols created with the left hand of other users.
+
+**Take breaks!** You need to collect a lot of samples. It can be tiresome to make the same letter for several minutes. You can pause the collection with the space bar and even save your work and come back later.
+
+**Get friends to help!** The more people the model can learn from, the better! You can save your work and add to it later.
+
+**Delete mistakes!** If you are training the model how to learn "G" and accidentally sign "H", the model will be less accurate. You can pause training and use "Shift+D" to DELETE several of the gathered samples. When in doubt, delete more so the model doesn't learn bad habits!
+
+**Vary your hand position.** Rotate your hand slightly and tip it forward and back while training. The model learns the angle and position of your fingers, palm and wrist. Move your hand around a bit to give it a chance to learn subtle variations in how you or others might make the same letter sign.
+
+#### Gathering Data
+
+You will need to provide examples of hand positions for each letter. Follow these steps to tea
+
+1. From within the application Choose `1. Collect Training Data`
+
+![1. Collect Training Data](./docs/images/traning_0.0.png)
+
+2. Choose `2. Create New Dataset`
+
+![2. Create New Dataset](./docs/images/traning_0.1.png)
+
+3. Input the characters you wish to use in your alphabet. For example `ABCDEFGHIJKLMNOPQRSTUVWXYZÆØÅ`
+4. Specify which letters are made using a dynamic sign.
+   - Static signs work best with approximately 2500 collected examples
+    - Dynamic signs work best with approximately 3500 collected examples
+
+![Configuration Complete](./docs/images/traning_1.0.png)
+
+1. Press the space bar to start collecting examples. Collection will start with the first letter in your alphabet.
+   - Collection starts paused and allows you to get your hand into position
+   - Press the space bar to start collecting. The model is learning "good data" if the skeleton is steady and unmoving
+   - When the status bar is full/reaches 100% you can move on to the next letter
+
+![Active Training](./docs/images/traning_1.1.png)
+
+6. Advance to the next letter by pressing that letter on the keyboard. 
+   - TIP: If you need a break, press ESC to save your progress
+
+7. After all letters are completed save your work. It will be saved on your desktop in the format `fingerspell_your_provided_name_YYYYMMDD_HHMM`
+
+#### Training
+
+Once you have collected signs, you need to train new AI models.
+
+1. Open the application and choose option `Train Models`'
+2. Choose the data from the list provided
+     - Hint: Press the number matching the folder you wish to use
+3. The training will complete in around 10-90 seconds depending on how many samples you have and your computerhardware and save to your desktop using the format `fingerspell_models_YYYYMMDD_HHMM`
+     - Hint: You can rename this folder, but it must remain on your desktop
+4. Choose `Load Custom Models` and then `Run Recognition` to try your models out!
 
 ## Development Approach
 
@@ -159,41 +245,6 @@ Dynamic Letter Model (5 letters):
  weighted avg       1.00      1.00      1.00      3226
 ```
 
-### Continued Improvements
-
-After the initial development phase, we continued to improve the product by doing the following:
-
-- 22 Jan: Error analysis leads to adding additional data. We gathered max confidence scores and identified signs that had poor performance. The goal is to get >=70 for all signs across three users.
-
-| Sign | Max AC | Max YM | Max AR | Average | Proposed Action                             |
-| ---- | ------ | ------ | ------ | ------- | ------------------------------------------- |
-| A    | 95     | 76     | 54     | 75      |                                             |
-| B    | 54     | 73     | 65     | 64      | Everyone: remove existing & add new samples |
-| C    | 100    | 91     | 80     | 90      |                                             |
-| D    | 100    | 45     | 85     | 77      |                                             |
-| E    | 89     | 85     | 85     | 86      |                                             |
-| F    | 83     | 76     | 71     | 77      |                                             |
-| G    | 62     | 57     | 60     | 60      | Everyone: remove existing & add new samples |
-| H    | 100    | 47     | 79     | 75      |                                             |
-| I    | 97     | 92     | 90     | 93      |                                             |
-| J    | 86     | 94     | 80     | 87      |                                             |
-| K    | 30     | 61     | 80     | 57      | Everyone: remove existing & add new samples |
-| L    | 70     | 20     | 80     | 57      | Yuliia add new sampless                     |
-| M    | 90     | 0      | 0      | 30      | Everyone: remove existing & add new samples |
-| N    | 70     | 0      | 0      | 23      | Everyone: remove existing & add new samples |
-| O    | 82     | 72     | 63     | 72      |                                             |
-| P    | 97     | 41     | 41     | 60      | Everyone: remove existing & add new samples |
-| Q    | 90     | 0      | 0      | 30      | Everyone: remove existing & add new samples |
-| R    | 92     | 93     | 0      | 62      | Andrii add new sampless                     |
-| S    | 99     | 70     | 60     | 76      |                                             |
-| T    | 60     | 86     | 80     | 75      | Aaron add new sampless                      |
-| U    | 100    | 100    | 91     | 97      |                                             |
-| V    | 82     | 84     | 68     | 78      |                                             |
-| W    | 99     | 90     | 82     | 90      |                                             |
-| X    | 82     | 91     | 77     | 83      |                                             |
-| Y    | 80     | 87     | 82     | 83      |                                             |
-| Z    | 90     | 94     | 73     | 86      |                                             |
-
 ### Key Lessons
 
 1. **Normalization matters**: MediaPipe's wrist-centered normalization is essential for position-invariant hand shape recognition, but it removes motion information. Capturing both normalized and raw coordinates solved this challenge.
@@ -201,6 +252,10 @@ After the initial development phase, we continued to improve the product by doin
 2. **Delta features as motion proxy**: Computing position differences across frame windows provides an effective, interpretable way to capture movement patterns without complex temporal modeling.
 
 3. **Model simplicity enables iteration**: Random Forest models train in seconds rather than minutes, allowing rapid experimentation with features, data collection strategies, and model architectures.
+
+## Next Steps
+
+
 
 ## Sources Cited
 
