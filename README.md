@@ -60,7 +60,7 @@ You will need to be able to type all the characters of your alphabet and underst
 
 **Static Signs**: A single stationary pose involving no hand movement or change in shape over time to represent a character.
 
-#### Training Tips
+### Training Tips
 
 **Avoid big movements.** Keep your hand steady within the frame. The model learns finger, wrist and palm positions. If you move around a quickly, it learns less accurately.
 
@@ -80,7 +80,7 @@ You will need to be able to type all the characters of your alphabet and underst
 
 **Vary your hand position.** Rotate your hand slightly and tip it forward and back while training. The model learns the angle and position of your fingers, palm and wrist. Move your hand around a bit to give it a chance to learn subtle variations in how you or others might make the same letter sign.
 
-#### Gathering Data
+### Gathering Data
 
 You will need to provide examples of hand positions for each letter. Follow these steps to tea
 
@@ -255,7 +255,15 @@ Dynamic Letter Model (5 letters):
 
 ## Next Steps
 
+### Data Quality Improvements
+- Collect training data from certified NGT instructors to ensure correct signing technique (current data was collected by non-expert team members and can contain errors).
 
+### Enhanced Learning Features
+- Implement guided practice mode with step-by-step tutorials, providing real-time feedback to help beginners learn correct hand shapes and movements.
+- Provide personalized feedback by identifying common mistakes based on user performance, such as incorrect finger positioning or inconsistent motion in dynamic letters.
+
+### Word Recognition
+- Create word-level and number recognition for fingerspelled words.
 
 ## Sources Cited
 
