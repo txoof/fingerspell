@@ -15,7 +15,7 @@ Finger Spelling Practice in Python
 **Authors:**
 
 - Andrii Rak
-- [Yuliia Medun](https://github.com/yuliiamedun/yuliiamedun.github.io/blob/main/Resume_Yuliia_Medun.pdf)
+- [Yuliia Medun](https://yuliiamedun.github.io/Resume_Yuliia_Medun.pdf)
 - [Aaron Ciuffo](https://txoof.github.io/cv_resume/)
 
 ## Project Description
