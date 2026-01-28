@@ -4,6 +4,7 @@ Main application window and event loop.
 Coordinates camera capture, hand detection, supervisor processing, and display.
 """
 
+import random
 import cv2
 import mediapipe as mp
 from src.fingerspell.core.landmarks import calc_landmark_list, pre_process_landmark
@@ -99,9 +100,9 @@ class AlphabetQuizWindow:
         if key == ord('f'):
             return 'next'
         
-        elif key == 9:  # Tab to toggle debug
-            self.show_debug = not self.show_debug
-            print(f"Debug overlay: {'ON' if self.show_debug else 'OFF'}")
+        # elif key == 9:  # Tab to toggle debug
+        #     self.show_debug = not self.show_debug
+        #     print(f"Debug overlay: {'ON' if self.show_debug else 'OFF'}")
         
         # Debug-only controls (threshold adjustments)
         elif self.show_debug:
@@ -218,7 +219,8 @@ class AlphabetQuizWindow:
         """Run the main application loop."""
         self.setup_camera()
         self.setup_mediapipe()
-        
+        celebration_words = ['Excellent!', 'Nice!', 'Wonderful!', 'Amazing!', 'Great!', 'Perfect!']
+
         try:
             for l in self.alphabet:
                 should_exit = False
@@ -229,9 +231,38 @@ class AlphabetQuizWindow:
                     
                     # Process frame
                     frame, result = self.process_frame(frame)
-                    cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_SIMPLEX, 3, (255, 0, 0), 6)
+                    
+                    # Draw outline (thicker, black) and main text on top (thinner, green)
+                    cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
+                    cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 100, 100), 6)
+
                     if result is not None:
                         if result.letter == l and result.confidence > self.supervisor.confidence_threshold_low:
+                            word = random.choice(celebration_words)
+                            for _ in range(45):
+                                ret, frame = self.cap.read()
+                                if not ret:
+                                    break
+                                frame = cv2.flip(frame, 1)
+
+                                # Draw outline (thicker, black) and main text on top (thinner, green)
+                                cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
+                                cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 100, 100), 6)
+
+                                # Center the text at bottom
+                                text_size = cv2.getTextSize(word, cv2.FONT_HERSHEY_DUPLEX, 3, 4)[0]
+                                text_x = (1280 - text_size[0]) // 2
+                                text_y = 680
+
+                                # Draw outline (thicker, black) and main text on top (thinner, green)
+                                cv2.putText(frame, word, (text_x, text_y), cv2.FONT_HERSHEY_DUPLEX, 3, (0, 0, 0), 10)
+                                cv2.putText(frame, word, (text_x, text_y), cv2.FONT_HERSHEY_DUPLEX, 3, (0, 255, 0), 4)
+                                
+                                cv2.imshow('Alphabet Quiz', frame)
+                                key = cv2.waitKey(1) & 0xFF
+                                if key == 27:  # Allow ESC during celebration
+                                    should_exit = True
+                                    break
                             break
                         print(result.letter, result.confidence)
                     # Display
