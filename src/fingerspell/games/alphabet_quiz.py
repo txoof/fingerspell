@@ -5,6 +5,7 @@ Coordinates camera capture, hand detection, supervisor processing, and display.
 """
 
 import random
+import numpy as np
 import cv2
 import mediapipe as mp
 from src.fingerspell.core.landmarks import calc_landmark_list, pre_process_landmark
@@ -15,8 +16,33 @@ from src.fingerspell.ui.display import (
     draw_no_hand_display,
     draw_debug_display
 )
-from src.fingerspell.ui.common import draw_landmarks
+from src.fingerspell.ui.common import draw_landmarks, draw_modal_overlay
 
+def show_rules_screen():
+    """Display rules screen and wait for key press."""
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    screen[:] = (40, 40, 40)
+    
+    message = "ALPHABET QUIZ\n\nShow the sign for each letter displayed in the top right corner.\n\nYour detected sign appears in the top left with color-coded accuracy:\nRed = Low  |  Yellow = Medium  |  Green = High\n\nControls:\nF - Skip letter\nESC - Exit\n\nPress any key to start"
+    
+    screen = draw_modal_overlay(screen, message, position='center')
+    
+    cv2.imshow("Alphabet Quiz", screen)
+    while cv2.waitKey(1) == -1:
+        pass
+
+def show_victory_screen():
+    """Display victory screen and wait for key press."""
+    screen = np.zeros((720, 1280, 3), dtype=np.uint8)
+    screen[:] = (40, 40, 40)
+    
+    message = "CONGRATULATIONS!\n\nYou completed the Alphabet Quiz!\n\nPress any key to exit"
+    
+    screen = draw_modal_overlay(screen, message, position='center')
+    
+    cv2.imshow("Alphabet Quiz", screen)
+    while cv2.waitKey(1) == -1:
+        pass
 
 class AlphabetQuizWindow:
     """Main application window for alphabet quiz."""
@@ -222,6 +248,7 @@ class AlphabetQuizWindow:
         celebration_words = ['Excellent!', 'Nice!', 'Wonderful!', 'Amazing!', 'Great!', 'Perfect!']
 
         try:
+            show_rules_screen()
             for l in self.alphabet:
                 should_exit = False
                 while self.cap.isOpened():
@@ -234,7 +261,7 @@ class AlphabetQuizWindow:
                     
                     # Draw outline (thicker, black) and main text on top (thinner, green)
                     cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
-                    cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 100, 100), 6)
+                    cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 150, 50), 6)
 
                     if result is not None:
                         if result.letter == l and result.confidence > self.supervisor.confidence_threshold_low:
@@ -247,7 +274,7 @@ class AlphabetQuizWindow:
 
                                 # Draw outline (thicker, black) and main text on top (thinner, green)
                                 cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
-                                cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 100, 100), 6)
+                                cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 150, 50), 6)
 
                                 # Center the text at bottom
                                 text_size = cv2.getTextSize(word, cv2.FONT_HERSHEY_DUPLEX, 3, 4)[0]
@@ -280,7 +307,7 @@ class AlphabetQuizWindow:
                 
                 if should_exit:
                     break
-        
+            show_victory_screen()
         finally:
             self.cleanup()
     
@@ -311,3 +338,4 @@ def run_quiz(static_model_path=None, dynamic_model_path=None,
         dynamic_labels_path
     )
     window.run()
+
