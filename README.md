@@ -7,6 +7,7 @@ Finger Spelling Practice in Python
 - [Project Description](#project-description)
 - [Setup](#setup)
 - [Training and Extending Models](#training-and-extending-models)
+- [Alphabet Quiz](#alphabet-quiz)
 - [Development Approach](#development-approach)
 - [Next Steps](#next-steps)
 - [Sources Cited](#sources-cited)
@@ -121,6 +122,22 @@ Once you have collected signs, you need to train new AI models.
 3. The training will complete in around 10-90 seconds depending on how many samples you have and your computerhardware and save to your desktop using the format `fingerspell_models_YYYYMMDD_HHMM`
      - Hint: You can rename this folder, but it must remain on your desktop
 4. Choose `Load Custom Models` and then `Run Recognition` to try your models out!
+
+## Alphabet Quiz
+
+The Alphabet Quiz is a fun way to practice fingerspelling. Select option 5 from the main menu to start.
+
+![Rules Screen](docs/images/quiz_rules.png)
+
+After reading the rules, press any key to begin. The letter you need to sign appears in the top right corner. Your detected sign and confidence level appear in the top left, color-coded: red (low), yellow (medium), or green (high confidence). Once the model reaches 80% confidence, a congratulation message appears and you move to the next letter.
+
+**Controls:**
+- **F** - Skip to next letter
+- **ESC** - Exit quiz
+
+![Quiz Example](docs/images/quiz_exaple.png)
+
+After completing all letters, a victory screen appears. Press any key to return to the main menu.
 
 ## Development Approach
 
