@@ -260,11 +260,12 @@ class AlphabetQuizWindow:
                     frame, result = self.process_frame(frame)
 
                     letter_size = cv2.getTextSize(l, cv2.FONT_HERSHEY_DUPLEX, 4, 6)[0]
-                    letter_x = (1280 - letter_size[0] - 50)
+                    letter_x = (frame.shape[1] - letter_size[0] - 50)
+                    letter_y = 100
 
                     # Draw outline (thicker, black) and main text on top (thinner, green)
-                    cv2.putText(frame, l, (letter_x, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
-                    cv2.putText(frame, l, (letter_x, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 150, 50), 6)
+                    cv2.putText(frame, l, (letter_x, letter_y), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
+                    cv2.putText(frame, l, (letter_x, letter_y), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 150, 50), 6)
 
                     if result is not None:
                         if result.letter == l and result.confidence > self.supervisor.confidence_threshold_low:
@@ -276,13 +277,13 @@ class AlphabetQuizWindow:
                                 frame = cv2.flip(frame, 1)
 
                                 # Draw outline (thicker, black) and main text on top (thinner, green)
-                                cv2.putText(frame, l, (letter_x, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
-                                cv2.putText(frame, l, (letter_x, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 150, 50), 6)
+                                cv2.putText(frame, l, (letter_x, letter_y), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
+                                cv2.putText(frame, l, (letter_x, letter_y), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 150, 50), 6)
 
                                 # Center the text at bottom
                                 text_size = cv2.getTextSize(word, cv2.FONT_HERSHEY_DUPLEX, 3, 4)[0]
-                                text_x = (1280 - text_size[0]) // 2
-                                text_y = 680
+                                text_x = (frame.shape[1] - text_size[0]) // 2
+                                text_y = frame.shape[0] - 50
 
                                 # Draw outline (thicker, black) and main text on top (thinner, green)
                                 cv2.putText(frame, word, (text_x, text_y), cv2.FONT_HERSHEY_DUPLEX, 3, (0, 0, 0), 10)
