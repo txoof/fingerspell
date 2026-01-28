@@ -9,6 +9,7 @@ from src.fingerspell.ui.menu import Menu
 from src.fingerspell.ui.window import run_app
 from src.fingerspell.collection.collector import run_collection
 from src.fingerspell.training.trainer import run_training_workflow
+from src.fingerspell.games.alphabet_quiz import run_quiz
 from src.fingerspell.recognition.model_loader import load_custom_models, get_default_models
 
 
@@ -46,6 +47,29 @@ def run_recognition_mode(project_root, custom_models=None):
     
     run_app(static_model_str, dynamic_model_str)
 
+def run_alphabet_quiz(project_root, custom_models=None):
+    """
+    Run alphabet quiz.
+    
+    Args:
+        project_root: Path to project root
+        custom_models: Optional dict with custom model paths (from load_custom_models())
+    """
+    # Use custom models if provided, otherwise use defaults
+    if custom_models:
+        static_model = custom_models.get('static_model_path')
+        dynamic_model = custom_models.get('dynamic_model_path')
+    else:
+        # Get default models
+        defaults = get_default_models(project_root)
+        static_model = defaults.get('static_model_path')
+        dynamic_model = defaults.get('dynamic_model_path')
+    
+    # Convert to strings for run_app
+    static_model_str = str(static_model) if static_model else None
+    dynamic_model_str = str(dynamic_model) if dynamic_model else None
+    
+    run_quiz(static_model_str, dynamic_model_str)
 
 def main(project_root):
     """Main application entry point."""
@@ -61,6 +85,7 @@ def main(project_root):
                 ('2', 'Train Models'),
                 ('3', 'Run Recognition'),
                 ('4', 'Load Custom Models'),
+                ('5', 'Play Alphabet Quiz'),
                 ('', ''),
                 ('', 'ESC - Quit')
             ],
@@ -86,3 +111,6 @@ def main(project_root):
             selected = load_custom_models()
             if selected:
                 custom_models = selected
+
+        elif choice == '5':
+            run_alphabet_quiz(project_root, custom_models)

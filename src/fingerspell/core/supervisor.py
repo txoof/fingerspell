@@ -46,8 +46,8 @@ class Supervisor:
         
         # Thresholds
         self.motion_threshold = 0.1
-        self.confidence_threshold_low = 70.0
-        self.confidence_threshold_high = 85.0
+        self.confidence_threshold_low = 50.0
+        self.confidence_threshold_high = 80.0
     
     def process_frame(self, normalized_landmarks, wrist_position) -> Optional[PredictionResult]:
         """
