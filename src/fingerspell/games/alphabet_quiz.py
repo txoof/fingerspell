@@ -94,7 +94,10 @@ class AlphabetQuizWindow:
         """
         # Global controls (always available)
         if key == 27:  # ESC to quit
-            return False
+            return 'quit'
+        
+        if key == ord('f'):
+            return 'next'
         
         elif key == 9:  # Tab to toggle debug
             self.show_debug = not self.show_debug
@@ -140,7 +143,7 @@ class AlphabetQuizWindow:
                 print(f"Confidence thresholds: Low={self.supervisor.confidence_threshold_low:.0f} "
                       f"High={self.supervisor.confidence_threshold_high:.0f}")
         
-        return True
+        return 'continue'
     
     def process_frame(self, frame):
         """
@@ -209,34 +212,43 @@ class AlphabetQuizWindow:
                 self.model_manager
             )
         
-        return frame
+        return frame, result
     
     def run(self):
         """Run the main application loop."""
         self.setup_camera()
         self.setup_mediapipe()
         
-
-        
         try:
             for l in self.alphabet:
+                should_exit = False
                 while self.cap.isOpened():
                     ret, frame = self.cap.read()
                     if not ret:
                         break
                     
                     # Process frame
-                    frame = self.process_frame(frame)
+                    frame, result = self.process_frame(frame)
                     cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_SIMPLEX, 3, (255, 0, 0), 6)
-                    
+                    if result is not None:
+                        if result.letter == l and result.confidence > self.supervisor.confidence_threshold_low:
+                            break
+                        print(result.letter, result.confidence)
                     # Display
-                    cv2.imshow('NGT Recognizer', frame)
+                    cv2.imshow('Alphabet Quiz', frame)
                     
                     # Handle keyboard
                     key = cv2.waitKey(1) & 0xFF
                     if key != 255:  # Key was pressed
-                        if not self.handle_keyboard(key):
+                        result = self.handle_keyboard(key)
+                        if result == 'quit':
+                            should_exit = True
                             break
+                        elif result == 'next':
+                            break
+                
+                if should_exit:
+                    break
         
         finally:
             self.cleanup()

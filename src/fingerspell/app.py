@@ -113,7 +113,4 @@ def main(project_root):
                 custom_models = selected
 
         elif choice == '5':
-            # Load custom models
-            selected = load_custom_models()
-            if selected:
-                custom_models = selected
+            run_alphabet_quiz(project_root, custom_models)
