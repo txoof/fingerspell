@@ -258,10 +258,13 @@ class AlphabetQuizWindow:
                     
                     # Process frame
                     frame, result = self.process_frame(frame)
-                    
+
+                    letter_size = cv2.getTextSize(l, cv2.FONT_HERSHEY_DUPLEX, 4, 6)[0]
+                    letter_x = (1280 - letter_size[0] - 50)
+
                     # Draw outline (thicker, black) and main text on top (thinner, green)
-                    cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
-                    cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 150, 50), 6)
+                    cv2.putText(frame, l, (letter_x, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
+                    cv2.putText(frame, l, (letter_x, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 150, 50), 6)
 
                     if result is not None:
                         if result.letter == l and result.confidence > self.supervisor.confidence_threshold_low:
@@ -273,8 +276,8 @@ class AlphabetQuizWindow:
                                 frame = cv2.flip(frame, 1)
 
                                 # Draw outline (thicker, black) and main text on top (thinner, green)
-                                cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
-                                cv2.putText(frame, l, (1100, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 150, 50), 6)
+                                cv2.putText(frame, l, (letter_x, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (0, 0, 0), 10)
+                                cv2.putText(frame, l, (letter_x, 120), cv2.FONT_HERSHEY_DUPLEX, 4, (255, 150, 50), 6)
 
                                 # Center the text at bottom
                                 text_size = cv2.getTextSize(word, cv2.FONT_HERSHEY_DUPLEX, 3, 4)[0]
@@ -291,7 +294,7 @@ class AlphabetQuizWindow:
                                     should_exit = True
                                     break
                             break
-                        print(result.letter, result.confidence)
+                        
                     # Display
                     cv2.imshow('Alphabet Quiz', frame)
                     
