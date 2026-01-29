@@ -1,0 +1,55 @@
+{
+    "alphabet_labels": ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M",
+                        "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"],
+    
+    "static_model": {
+        "model_path": "../models/ngt_static_classifier.pkl",
+        "total_features": 42,
+        "feature_description": "Normalized (x,y) coordinates for 21 hand landmarks",
+        "normalization": "Relative to wrist (landmark 0), scaled by max absolute value",
+        "labels": {
+            "count": 21,
+            "indices": [0, 1, 2, 3, 4, 5, 6, 8, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22, 24],
+            "letters": ["A", "B", "C", "D", "E", "F", "G", "I", "K", "L", "M", 
+                        "N", "O", "P", "Q", "R", "S", "T", "V", "W", "Y"]
+        },
+        "training_samples": 42909,
+        "test_accuracy": 0.995
+    },
+    
+    "dynamic_model": {
+        "model_path": "../models/ngt_dynamic_classifier.pkl",
+        "total_features": 84,
+        "feature_groups": {
+            "current_frame": {
+                "count": 42,
+                "description": "Normalized (x,y) coordinates for 21 hand landmarks at current frame",
+                "normalization": "Relative to wrist (landmark 0), scaled by max absolute value"
+            },
+            "delta_features": {
+                "count": 42,
+                "description": "Change in (x,y) coordinates from 5 frames prior to current frame",
+                "computation": "current_landmark - landmark_from_5_frames_ago",
+                "purpose": "Captures hand motion dynamics for gesture classification"
+            }
+        },
+        "rolling_window_size": 5,
+        "frame_rate_target": 30,
+        "time_span_ms": 167,
+        "labels": {
+            "count": 5,
+            "indices": [7, 9, 20, 23, 25],
+            "letters": ["H", "J", "U", "X", "Z"]
+        },
+        "training_samples": 16128,
+        "test_accuracy": 1.0
+    },
+    
+    "inference_config": {
+        "wrist_motion_threshold": 0.1,
+        "wrist_motion_window": 10,
+        "rolling_window_size": 5,
+        "min_detection_confidence": 0.7,
+        "min_tracking_confidence": 0.5
+    }
+}

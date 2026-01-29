@@ -1,0 +1,642 @@
+"""
+Data management utilities for sign language collection.
+
+Handles saving collected data, discarding samples, and displaying collection status.
+"""
+
+import csv
+from datetime import datetime
+from pathlib import Path
+import pandas as pd
+import cv2
+import json
+from PIL import Image, ImageDraw, ImageFont
+from src.fingerspell.ui.common import draw_modal_input, draw_modal_overlay, draw_text, draw_text_window
+
+
+def save_final_data(cap, temp_filename_static, temp_filename_dynamic, alphabet, label_map, dynamic_letters, window_name='Data Collection'):
+    """
+    Save final training data to Desktop from already-separated temp files.
+    
+    Prompts user for dataset name, then saves with custom or default name.
+    
+    Args:
+        cap: Existing cv2.VideoCapture object for name input
+        temp_filename_static: Path to static temp CSV file
+        temp_filename_dynamic: Path to dynamic temp CSV file
+        alphabet: List of characters in the alphabet
+        label_map: Dict mapping characters to original label indices
+        dynamic_letters: Set of dynamic letter characters
+        window_name: OpenCV window name
+    
+    Returns:
+        str: Path to output directory if save successful, None if no data to save
+    """
+    from src.fingerspell.collection.naming import get_dataset_name
+    
+    # Read both temp files
+    static_rows = []
+    dynamic_rows = []
+    
+    # Read static file
+    try:
+        with open(temp_filename_static, 'r', newline='', encoding='utf-8', errors='replace') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if not row or any('\x00' in cell for cell in row):
+                    continue
+                static_rows.append(row[1:])  # Strip sample_id
+    except:
+        pass
+    
+    # Read dynamic file
+    try:
+        with open(temp_filename_dynamic, 'r', newline='', encoding='utf-8', errors='replace') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                if not row or any('\x00' in cell for cell in row):
+                    continue
+                dynamic_rows.append(row[1:])  # Strip sample_id
+    except:
+        pass
+    
+    # Check if we have any data
+    if len(static_rows) == 0 and len(dynamic_rows) == 0:
+        return None
+    
+    # Get dataset name from user
+    dataset_name = get_dataset_name(cap, window_name)
+    
+    # Create output directory with custom name
+    desktop = Path.home() / "Desktop"
+    output_dir = desktop / dataset_name
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Process static data
+    if static_rows:
+        # Extract letters from static rows and relabel
+        static_letters_from_rows = set()
+        for row in static_rows:
+            label_idx = int(row[0])
+            for char, idx in label_map.items():
+                if idx == label_idx:
+                    static_letters_from_rows.add(char)
+                    break
+        
+        # Create new label mapping for static
+        static_letters = sorted(static_letters_from_rows, key=lambda x: ord(x))
+        static_label_map = {char: idx for idx, char in enumerate(static_letters)}
+        
+        # Relabel rows
+        relabeled_static = []
+        for row in static_rows:
+            old_label = int(row[0])
+            # Find letter for old label
+            letter = None
+            for char, idx in label_map.items():
+                if idx == old_label:
+                    letter = char
+                    break
+            if letter:
+                new_label = static_label_map[letter]
+                relabeled_static.append([new_label] + row[1:])
+        
+        # Save static keypoints
+        static_path = output_dir / "keypoint_data_static.csv"
+        with open(static_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(relabeled_static)
+        
+        # Save static labels
+        static_label_path = output_dir / "keypoint_classifier_label_static.csv"
+        with open(static_label_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            for letter in static_letters:
+                writer.writerow([letter])
+    
+    # Process dynamic data
+    if dynamic_rows:
+        # Extract letters from dynamic rows and relabel
+        dynamic_letters_from_rows = set()
+        for row in dynamic_rows:
+            label_idx = int(row[0])
+            for char, idx in label_map.items():
+                if idx == label_idx:
+                    dynamic_letters_from_rows.add(char)
+                    break
+        
+        # Create new label mapping for dynamic
+        dynamic_letters_list = sorted(dynamic_letters_from_rows, key=lambda x: ord(x))
+        dynamic_label_map = {char: idx for idx, char in enumerate(dynamic_letters_list)}
+        
+        # Relabel rows
+        relabeled_dynamic = []
+        for row in dynamic_rows:
+            old_label = int(row[0])
+            # Find letter for old label
+            letter = None
+            for char, idx in label_map.items():
+                if idx == old_label:
+                    letter = char
+                    break
+            if letter:
+                new_label = dynamic_label_map[letter]
+                relabeled_dynamic.append([new_label] + row[1:])
+        
+        # Save dynamic keypoints
+        dynamic_path = output_dir / "keypoint_data_dynamic.csv"
+        with open(dynamic_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerows(relabeled_dynamic)
+        
+        # Save dynamic labels
+        dynamic_label_path = output_dir / "keypoint_classifier_label_dynamic.csv"
+        with open(dynamic_label_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            for letter in dynamic_letters_list:
+                writer.writerow([letter])
+    
+    # Save metadata
+    metadata = {
+        'alphabet': alphabet,
+        'dynamic_letters': sorted(list(dynamic_letters)),
+        'created': datetime.now().isoformat(),
+        'modified': datetime.now().isoformat()
+    }
+    
+    metadata_path = output_dir / 'dataset_metadata.json'
+    with open(metadata_path, 'w', encoding='utf-8') as f:
+        json.dump(metadata, f, indent=2, ensure_ascii=False)
+    
+    return str(output_dir)
+
+
+def discard_samples(cap, temp_filename_static, temp_filename_dynamic, alphabet, label_map, collected_per_letter, dynamic_letters, window_name='Data Collection'):
+    """
+    Interactive workflow to discard samples for a specific letter.
+    
+    Shows camera-based modals to select letter, specify count, and confirm.
+    Removes samples from the appropriate temporary CSV file.
+    
+    Args:
+        cap: Existing cv2.VideoCapture object to reuse
+        temp_filename_static: Path to static temporary CSV file
+        temp_filename_dynamic: Path to dynamic temporary CSV file
+        alphabet: List of valid characters
+        label_map: Dict mapping characters to label indices
+        collected_per_letter: Dict tracking samples per letter
+        dynamic_letters: Set of dynamic letters
+        window_name: Name of the window to display in
+    
+    Returns:
+        dict: Updated collected_per_letter dict
+    """
+    # Step 1: Get letter to discard
+    letter_input = ""
+    
+    while True:
+        ret, image = cap.read()
+        if not ret:
+            break
+        
+        image = cv2.flip(image, 1)
+        image = draw_modal_input(image, "Which letter to discard?", letter_input)
+        
+        cv2.imshow(window_name, image)
+        key = cv2.waitKey(1)
+        
+        if key == 27:  # ESC - cancel
+            return collected_per_letter
+        elif key == 13:  # ENTER
+            if letter_input in alphabet:
+                break
+            else:
+                letter_input = ""  # Invalid, clear
+        elif key == 8:  # BACKSPACE
+            letter_input = letter_input[:-1]
+        elif 32 <= key <= 126:
+            letter_input += chr(key).upper()
+    
+    target_letter = letter_input
+    current_count = collected_per_letter[target_letter]
+    
+    # Step 2: Get count to discard
+    count_input = ""
+    
+    while True:
+        ret, image = cap.read()
+        if not ret:
+            break
+        
+        image = cv2.flip(image, 1)
+        prompt = f"Discard how many samples of '{target_letter}'? (1-{current_count} or 'all')"
+        image = draw_modal_input(image, prompt, count_input)
+        
+        cv2.imshow(window_name, image)
+        key = cv2.waitKey(1)
+        
+        if key == 27:  # ESC - cancel
+            return collected_per_letter
+        elif key == 13:  # ENTER
+            if count_input.lower() == 'all':
+                discard_count = current_count
+                break
+            elif count_input.isdigit():
+                discard_count = int(count_input)
+                if 1 <= discard_count <= current_count:
+                    break
+            count_input = ""  # Invalid
+        elif key == 8:  # BACKSPACE
+            count_input = count_input[:-1]
+        elif 32 <= key <= 126:
+            count_input += chr(key)
+    
+    # Step 3: Confirm
+    confirm_input = ""
+    
+    while True:
+        ret, image = cap.read()
+        if not ret:
+            break
+        
+        image = cv2.flip(image, 1)
+        message = f"Discard {discard_count} samples of '{target_letter}'?\n\nType 'yes' to confirm, ESC to cancel"
+        image = draw_modal_overlay(image, message, position='center')
+        
+        # Show what they're typing
+        cv2.putText(image, confirm_input, (image.shape[1]//2 - 50, image.shape[0]//2 + 100),
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2)
+        
+        cv2.imshow(window_name, image)
+        key = cv2.waitKey(1)
+        
+        if key == 27:  # ESC - cancel
+            return collected_per_letter
+        elif key == 13:  # ENTER
+            if confirm_input.lower() == 'yes':
+                break
+            confirm_input = ""
+        elif key == 8:  # BACKSPACE
+            confirm_input = confirm_input[:-1]
+        elif 32 <= key <= 126:
+            confirm_input += chr(key)
+    
+    # Actually discard from CSV
+    print(f"Discarding {discard_count} samples of '{target_letter}'...")
+    
+    # Determine which file to modify
+    is_dynamic = target_letter in dynamic_letters
+    temp_filename = temp_filename_dynamic if is_dynamic else temp_filename_static
+    
+    # Read CSV with pandas (now we can since rows are consistent length)
+    df = pd.read_csv(temp_filename, header=None)
+    
+    # Get label index for this letter
+    target_label = label_map[target_letter]
+    
+    # Find all rows with this label
+    mask = df[1] == target_label  # Column 1 is label_index (after sample_id)
+    matching_indices = df[mask].index.tolist()
+    
+    # Remove last N samples
+    if discard_count >= len(matching_indices):
+        # Remove all
+        df = df[~mask]
+    else:
+        # Remove last N
+        indices_to_remove = matching_indices[-discard_count:]
+        df = df.drop(indices_to_remove)
+    
+    # Rewrite CSV
+    df.to_csv(temp_filename, header=False, index=False)
+    
+    # Update tracking
+    collected_per_letter[target_letter] -= discard_count
+    
+    print(f"Discarded {discard_count} samples. Remaining for '{target_letter}': {collected_per_letter[target_letter]}")
+    
+    return collected_per_letter
+
+def draw_letter_status(image, alphabet, collected_per_letter, targets, dynamic_letters):
+    """
+    Draw letter status as a full width, wrapped text window at the bottom.
+    """
+    parts = []
+    for letter in alphabet:
+        count = collected_per_letter.get(letter, 0)
+        target = targets.get(letter, 0)
+        is_complete = count >= target
+        checkbox = '☑' if is_complete else '☐'
+        parts.append(f'{checkbox}{letter}({count})')
+
+    status = ' '.join(parts)
+
+    return draw_text_window(
+        image=image,
+        text=status,
+        font_size=24,
+        first_line_color=(255, 255, 255),
+        color=(255, 255, 255),
+        position='bottomleft',
+        margin=10,
+        padding=20,
+        bg_color=(0, 0, 0),
+        bg_alpha=0.85,
+        border_color=(100, 100, 100),
+        wrap=True,
+        fill_width=True
+    )
+
+
+def show_save_confirmation(cap, window_name='Data Collection'):
+    """
+    Show modal asking user if they want to save collected data.
+    
+    Args:
+        cap: Existing cv2.VideoCapture object to reuse
+        window_name: Name of the window to display in
+    
+    Returns:
+        bool: True if user wants to save (pressed Y), False if not (pressed N or ESC)
+    """
+    message = "Save collected data?\n\nPress Y to save\nPress N or ESC to exit without saving"
+    
+    while True:
+        ret, image = cap.read()
+        if not ret:
+            return False
+        
+        image = cv2.flip(image, 1)
+        image = draw_modal_overlay(image, message, position='center')
+        
+        cv2.imshow(window_name, image)
+        
+        key = cv2.waitKey(1)
+        
+        if key == ord('Y') or key == ord('y'):
+            return True
+        elif key == ord('N') or key == ord('n') or key == 27:  # N or ESC
+            return False
+
+
+def show_save_success(cap, save_path, window_name='Data Collection'):
+    """
+    Show modal with successful save path and wait for keypress.
+    
+    Args:
+        cap: Existing cv2.VideoCapture object to reuse
+        save_path: Path where data was saved
+        window_name: Name of the window to display in
+    """
+    message = f"Data saved successfully!\n\nLocation:\n{save_path}\n\nPress any key to close"
+    
+    while True:
+        ret, image = cap.read()
+        if not ret:
+            return
+        
+        image = cv2.flip(image, 1)
+        image = draw_modal_overlay(image, message, position='center', width_percent=80)
+        
+        cv2.imshow(window_name, image)
+        
+        key = cv2.waitKey(1)
+        
+        if key != -1:  # Any key pressed
+            return
+
+# def draw_letter_status(image, alphabet, collected_per_letter, targets, dynamic_letters):
+#     """
+#     Draw letter status with auto-wrapping for long alphabets.
+#     """
+#     h, w = image.shape[:2]
+    
+#     # Build status text with Unicode checkboxes
+#     text = ""
+#     for letter in alphabet:
+#         count = collected_per_letter.get(letter, 0)
+#         target = targets.get(letter, 0)
+#         is_complete = count >= target
+        
+#         # Unicode ballot box: ☑ for complete, ☐ for incomplete
+#         checkbox = "☑" if is_complete else "☐"
+#         text += f"{checkbox}{letter}({count}) "
+    
+#     # Measure text to calculate wrapping
+#     font_size = 24
+#     bundled_font = Path("../assets/fonts/DejaVuSans.ttf")
+#     try:
+#         font = ImageFont.truetype(str(bundled_font), font_size)
+#     except:
+#         font = ImageFont.load_default()
+    
+#     pil_image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
+#     draw_obj = ImageDraw.Draw(pil_image)
+    
+#     # Calculate available width
+#     available_width = w - 40  # 20px padding on each side
+    
+#     # Wrap text manually by measuring
+#     words = text.split()
+#     lines = []
+#     current_line = ""
+    
+#     for word in words:
+#         test_line = current_line + word + " "
+#         bbox = draw_obj.textbbox((0, 0), test_line, font=font)
+#         line_width = bbox[2] - bbox[0]
+        
+#         if line_width <= available_width:
+#             current_line = test_line
+#         else:
+#             if current_line:
+#                 lines.append(current_line.strip())
+#             current_line = word + " "
+    
+#     if current_line:
+#         lines.append(current_line.strip())
+    
+#     # Calculate box height based on number of lines
+#     line_height = 35
+#     padding = 20
+#     box_height = len(lines) * line_height + padding * 2
+#     y_start = h - box_height - 10
+    
+#     # Semi-transparent background
+#     overlay = image.copy()
+#     cv2.rectangle(overlay, (10, y_start), (w - 10, h - 10), (0, 0, 0), -1)
+#     cv2.addWeighted(overlay, 0.85, image, 0.15, 0, image)
+    
+#     # Draw each line
+#     y_text = y_start + padding
+#     for line in lines:
+#         image = draw_text(image, line, (20, y_text),
+#                          font_size=font_size, color=(255, 255, 255))
+#         y_text += line_height
+    
+#     return image
+
+
+def load_existing_dataset(dataset_dir):
+    """
+    Load alphabet and dynamic letters from existing dataset.
+    
+    Reads metadata.json if available, otherwise falls back to label files.
+    
+    Args:
+        dataset_dir: Path to dataset directory
+        
+    Returns:
+        dict: {
+            'alphabet': list of characters,
+            'dynamic_letters': set of dynamic characters,
+            'label_map': dict mapping characters to indices,
+            'static_data_path': Path to static CSV or None,
+            'dynamic_data_path': Path to dynamic CSV or None,
+            'static_samples': int count of existing static samples,
+            'dynamic_samples': int count of existing dynamic samples
+        }
+        Returns None if dataset invalid
+    """
+    dataset_dir = Path(dataset_dir)
+    metadata_path = dataset_dir / 'dataset_metadata.json'
+    
+    # Try loading from metadata file first
+    if metadata_path.exists():
+        with open(metadata_path, 'r', encoding='utf-8') as f:
+            metadata = json.load(f)
+        
+        alphabet = metadata['alphabet']
+        dynamic_letters = set(metadata['dynamic_letters'])
+    else:
+        # Fallback: load from label files (for backward compatibility)
+        static_labels_path = dataset_dir / 'keypoint_classifier_label_static.csv'
+        dynamic_labels_path = dataset_dir / 'keypoint_classifier_label_dynamic.csv'
+        
+        has_static = static_labels_path.exists()
+        has_dynamic = dynamic_labels_path.exists()
+        
+        if not has_static and not has_dynamic:
+            return None
+        
+        # Load letters from label files
+        static_letters = []
+        dynamic_letters_list = []
+        
+        if has_static:
+            with open(static_labels_path, 'r', encoding='utf-8-sig') as f:
+                static_letters = [row[0] for row in csv.reader(f)]
+        
+        if has_dynamic:
+            with open(dynamic_labels_path, 'r', encoding='utf-8-sig') as f:
+                dynamic_letters_list = [row[0] for row in csv.reader(f)]
+        
+        # Combine to get full alphabet
+        all_letters = set(static_letters + dynamic_letters_list)
+        alphabet = sorted(all_letters, key=lambda x: ord(x))
+        dynamic_letters = set(dynamic_letters_list)
+    
+    # Check for data files
+    static_data = dataset_dir / 'keypoint_data_static.csv'
+    dynamic_data = dataset_dir / 'keypoint_data_dynamic.csv'
+    
+    # Create label mapping (sorted by unicode)
+    label_map = {char: idx for idx, char in enumerate(alphabet)}
+    
+    # Count existing samples
+    static_samples = 0
+    dynamic_samples = 0
+    
+    if static_data.exists():
+        with open(static_data) as f:
+            static_samples = sum(1 for line in f)
+    
+    if dynamic_data.exists():
+        with open(dynamic_data) as f:
+            dynamic_samples = sum(1 for line in f)
+    
+    return {
+        'alphabet': alphabet,
+        'dynamic_letters': dynamic_letters,
+        'label_map': label_map,
+        'static_data_path': static_data if static_data.exists() else None,
+        'dynamic_data_path': dynamic_data if dynamic_data.exists() else None,
+        'static_samples': static_samples,
+        'dynamic_samples': dynamic_samples
+    }
+
+
+def load_existing_data_into_temp_files(temp_file_static, temp_file_dynamic, 
+                                       existing_static_path, existing_dynamic_path,
+                                       label_map):
+    """
+    Load existing dataset samples into temp files for editing.
+    
+    Reads existing CSV files and writes to temp files with sample_id column added.
+    Maps old label indices to new label_map.
+    
+    Args:
+        temp_file_static: Open temp file for static data
+        temp_file_dynamic: Open temp file for dynamic data
+        existing_static_path: Path to existing static CSV or None
+        existing_dynamic_path: Path to existing dynamic CSV or None
+        label_map: New label mapping for this session
+        
+    Returns:
+        dict: {letter: count} of loaded samples per letter
+    """
+    sample_id = 0
+    collected_per_letter = {}
+    
+    csv_writer_static = csv.writer(temp_file_static)
+    csv_writer_dynamic = csv.writer(temp_file_dynamic)
+    
+    # Load static data if exists
+    if existing_static_path and existing_static_path.exists():
+        # Load old labels
+        labels_path = existing_static_path.parent / 'keypoint_classifier_label_static.csv'
+        with open(labels_path, 'r', encoding='utf-8-sig') as f:
+            old_labels = [row[0] for row in csv.reader(f)]
+        
+        # Read and remap data
+        with open(existing_static_path, 'r') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                old_label_idx = int(row[0])
+                old_letter = old_labels[old_label_idx]
+                new_label_idx = label_map[old_letter]
+                
+                # Write with new label and sample_id
+                csv_writer_static.writerow([sample_id, new_label_idx] + row[1:])
+                sample_id += 1
+                
+                # Track count
+                collected_per_letter[old_letter] = collected_per_letter.get(old_letter, 0) + 1
+        
+        temp_file_static.flush()
+    
+    # Load dynamic data if exists
+    if existing_dynamic_path and existing_dynamic_path.exists():
+        # Load old labels
+        labels_path = existing_dynamic_path.parent / 'keypoint_classifier_label_dynamic.csv'
+        with open(labels_path, 'r', encoding='utf-8-sig') as f:
+            old_labels = [row[0] for row in csv.reader(f)]
+        
+        # Read and remap data
+        with open(existing_dynamic_path, 'r') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                old_label_idx = int(row[0])
+                old_letter = old_labels[old_label_idx]
+                new_label_idx = label_map[old_letter]
+                
+                # Write with new label and sample_id
+                csv_writer_dynamic.writerow([sample_id, new_label_idx] + row[1:])
+                sample_id += 1
+                
+                # Track count
+                collected_per_letter[old_letter] = collected_per_letter.get(old_letter, 0) + 1
+        
+        temp_file_dynamic.flush()
+    
+    return collected_per_letter
